@@ -1496,22 +1496,18 @@ async function generarExcel(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagarés');
   const fname = 'Pagares_'+(lote.orden||'preview')+'_'+lote.deudor.replace(/\s+/g,'_').slice(0,20)+'.xlsx';
-  if (PE_ACTIVE) {
-    // Convertir a base64 y enviar por correo
-    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
-    showLoading('Enviando Excel a tu correo...');
+  if (PE_ACTIVE && CURR_LOTE?.orden) {
+    showLoading('Enviando reporte a tu correo...');
     const r2 = await api({
-      action   : 'sendPrivEmail',
-      token    : SESSION.token,
-      tipo     : 'excel',
-      orden    : CURR_LOTE?.orden||'preview',
-      deudor   : (CURR_LOTE?.deudor||'').split('|||')[0],
-      fileName : fname,
-      fileB64  : wbout
+      action : 'sendPrivEmail',
+      token  : SESSION.token,
+      tipo   : 'excel',
+      orden  : CURR_LOTE.orden,
+      deudor : (CURR_LOTE.deudor||'').split('|||')[0]
     });
     hideLoading();
-    if (r2.ok) toast('📧 Excel enviado a tu correo','ok');
-    else { XLSX.writeFile(wb, fname); toast('✓ Excel generado (correo falló)','inf'); }
+    if (r2.ok) toast('📧 Reporte CSV enviado a tu correo','ok');
+    else { XLSX.writeFile(wb, fname); toast('✓ Excel generado localmente','inf'); }
   } else {
     XLSX.writeFile(wb, fname);
     toast('✓ Excel generado','ok');
@@ -1579,27 +1575,23 @@ async function generarReportePDF(){
   const pa = document.getElementById('print-area');
   const prev = pa.style.display;
   pa.style.display = 'none';
-  if (PE_ACTIVE) {
-    // Capturar HTML del reporte y enviar por correo
-    const rptHtml = document.getElementById('report-print-area').innerHTML;
-    pa.style.display = prev;
-    document.getElementById('report-print-area').innerHTML='';
+  pa.style.display = prev;
+  document.getElementById('report-print-area').innerHTML='';
+
+  if (PE_ACTIVE && CURR_LOTE?.orden) {
     showLoading('Enviando reporte a tu correo...');
     const r2 = await api({
-      action   : 'sendPrivEmail',
-      token    : SESSION.token,
-      tipo     : 'reporte',
-      orden    : CURR_LOTE?.orden||'preview',
-      deudor   : (CURR_LOTE?.deudor||'').split('|||')[0],
-      rptHtml  : rptHtml
+      action : 'sendPrivEmail',
+      token  : SESSION.token,
+      tipo   : 'reporte',
+      orden  : CURR_LOTE.orden,
+      deudor : (CURR_LOTE.deudor||'').split('|||')[0]
     });
     hideLoading();
     if (r2.ok) toast('📧 Reporte enviado a tu correo','ok');
     else toast('Error al enviar el reporte','err');
   } else {
     window.print();
-    pa.style.display = prev;
-    document.getElementById('report-print-area').innerHTML='';
     toast('✓ Reporte enviado a imprimir','ok');
   }
 }
@@ -1609,6 +1601,19 @@ async function generarReportePDF(){
 // ════════════════════════════════════════════════════════
 async function api(params){
   try {
+    // Usar POST para sendPrivEmail (payload grande)
+    if (params.action === 'sendPrivEmail') {
+      const res = await fetch(API_URL, {
+        method  : 'POST',
+        redirect: 'follow',
+        headers : { 'Content-Type': 'application/json' },
+        body    : JSON.stringify(params)
+      });
+      const txt = await res.text();
+      try { return JSON.parse(txt); }
+      catch { const m=txt.match(/\{[\s\S]*\}/); if(m) return JSON.parse(m[0]); throw new Error('Respuesta inválida'); }
+    }
+    // GET para el resto
     const url = API_URL+'?'+new URLSearchParams(params).toString();
     const res = await fetch(url,{redirect:'follow'});
     const txt = await res.text();
