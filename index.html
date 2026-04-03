@@ -81,7 +81,8 @@ a{color:var(--green);text-decoration:none}
 .uc-email{font-size:10px;color:var(--text3)}
 .uc-badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600;font-family:var(--mono)}
 .uc-badge.admin{background:var(--goldbg);color:var(--gold);border:1px solid rgba(228,170,34,.25)}
-.uc-badge.user{background:var(--greenbg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.uc-badge.pro{background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
+.uc-badge.user{background:var(--bg2);color:var(--text3);border:1px solid var(--border)}
 .cupo-lbl{display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px}
 .cupo-lbl span:first-child{color:var(--text2)}
 .cupo-val{font-family:var(--mono);font-weight:600}
@@ -449,9 +450,10 @@ select.finp option{background:var(--bg2)}
             <span class="modo-ico">=$</span>
             <span class="modo-lbl">Cuota<br>fija</span>
           </button>
-          <button class="modo-btn" id="mbtn-fin" onclick="setModo('fin')">
+          <button class="modo-btn" id="mbtn-fin" onclick="IS_PRO?setModo('fin'):showProModal('financiero')">
             <span class="modo-ico">📊</span>
             <span class="modo-lbl">Sistema<br>financiero</span>
+            <span id="fin-lock" style="display:none;font-size:9px;color:var(--blue)">⭐ PRO</span>
           </button>
         </div>
 
@@ -656,6 +658,33 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- Modal PRO upgrade -->
+<div class="overlay" id="pro-overlay">
+  <div class="modal">
+    <div class="modal-icon">⭐</div>
+    <div class="modal-title">Función exclusiva PRO</div>
+    <div class="modal-msg" id="pro-modal-msg">Esta función está disponible en el plan PRO.</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px;text-align:left">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Plan PRO incluye</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text2)">
+        <div>📊 Sistema financiero Francés, Alemán y tasa fija</div>
+        <div>📄 Reporte PDF completo</div>
+        <div>💾 Backup completo de operaciones</div>
+        <div>♾️ Operaciones ilimitadas</div>
+        <div>📅 Historial ilimitado</div>
+        <div>✉️ Soporte email prioritario</div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="closeProModal()">Cerrar</button>
+      <button class="mbtn mbtn-confirm" style="background:var(--blue)"
+              onclick="closeProModal();window.open('mailto:info@tasks-on.com?subject=Upgrade%20a%20PRO','_blank')">
+        ✉ Solicitar PRO
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal -->
 <div class="overlay" id="modal-overlay">
   <div class="modal">
@@ -695,6 +724,7 @@ let MODO       = 'ci';
 let SISTEMA    = 'FRANCES';
 let TIPO_TASA  = 'TNA';
 let PE_ACTIVE  = false;       // Privacidad Extrema — OFF por defecto
+let IS_PRO     = false;       // Plan PRO
 
 // ════════════════════════════════════════════════════════
 //  INIT
@@ -751,6 +781,7 @@ function showApp(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').classList.add('visible');
   renderUser(); loadStats(); goTab('nueva');
+  setTimeout(()=>{ const l=document.getElementById('fin-lock'); if(l) l.style.display=IS_PRO?'none':'inline'; },150);
 }
 
 // ════════════════════════════════════════════════════════
@@ -795,11 +826,13 @@ function logout(){
 function renderUser(){
   if (!SESSION) return;
   const u = SESSION.user;
+  IS_PRO = u.esPro || u.esAdmin || false;
   document.getElementById('uc-name').textContent  = u.nombre||u.email;
   document.getElementById('uc-email').textContent = u.email;
   const b = document.getElementById('uc-badge');
-  b.textContent = u.esAdmin?'ADMIN':'USUARIO';
-  b.className   = 'uc-badge '+(u.esAdmin?'admin':'user');
+  if (u.esAdmin) { b.textContent='ADMIN'; b.className='uc-badge admin'; }
+  else if (IS_PRO) { b.textContent='PRO'; b.className='uc-badge pro'; }
+  else { b.textContent='STD'; b.className='uc-badge user'; }
   if (u.esAdmin) document.getElementById('th-email').style.display='table-cell';
   updateCupo(u.cupo, u.cupoUsado);
 }
@@ -836,7 +869,7 @@ function goTab(tab){
   }
   if (tab==='vista' && CURR_LOTE && CURR_SERIE.length){
     addTbtn(tr,'📊 Excel',()=>generarExcel(),'tbtn-green');
-    addTbtn(tr,'📄 Reporte PDF',()=>generarReportePDF());
+    addTbtn(tr, IS_PRO?'📄 Reporte PDF':'📄 Reporte ⭐', IS_PRO?()=>generarReportePDF():()=>showProModal('reporte'));
     addTbtn(tr,'🖨 Imprimir pagarés',doPrint,'tbtn-gold');
   }
   if (tab==='browser' && ALL_LOTES.length===0) loadLotes();
@@ -1302,7 +1335,7 @@ function renderVista(lote, serie){
   // Update topbar
   const tr=document.getElementById('topbar-right'); tr.innerHTML='';
   addTbtn(tr,'📊 Excel',generarExcel,'tbtn-green');
-  addTbtn(tr,'📄 Reporte',generarReportePDF);
+  addTbtn(tr, IS_PRO?'📄 Reporte':'📄 Reporte ⭐', IS_PRO?generarReportePDF:()=>showProModal('reporte'));
   addTbtn(tr,'🖨 Imprimir',doPrint,'tbtn-gold');
 }
 
@@ -1625,6 +1658,16 @@ async function api(params){
 // ════════════════════════════════════════════════════════
 //  MODAL / LOADING / TOAST
 // ════════════════════════════════════════════════════════
+function showProModal(feature) {
+  const msgs = {
+    financiero: 'El sistema financiero (Francés, Alemán y tasa fija) está disponible en el plan PRO.',
+    reporte   : 'El reporte PDF completo está disponible en el plan PRO.',
+  };
+  document.getElementById('pro-modal-msg').textContent = msgs[feature]||'Esta función está disponible en el plan PRO.';
+  document.getElementById('pro-overlay').classList.add('show');
+}
+function closeProModal() { document.getElementById('pro-overlay').classList.remove('show'); }
+
 let _modalCb=null;
 function showModal(icon,title,msg,onConfirm){
   document.getElementById('modal-icon').textContent=icon;
