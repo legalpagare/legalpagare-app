@@ -314,6 +314,29 @@ select.finp option{background:var(--bg2)}
 
 /* Privacidad Extrema */
 #pe-toggle.pe-on{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
+
+/* Banner vencimiento */
+.venc-banner{
+  padding:8px 20px;font-size:11px;font-weight:600;text-align:center;
+  display:none;align-items:center;justify-content:center;gap:8px;
+  flex-shrink:0;
+}
+.venc-banner.warn{
+  display:flex;background:var(--amberbg);color:var(--amber);
+  border-bottom:1px solid rgba(245,158,11,.2);
+}
+.venc-banner.expired{
+  display:flex;background:var(--redbg);color:var(--red);
+  border-bottom:1px solid rgba(239,68,68,.2);
+}
+
+/* Cupo vencimiento en sidebar */
+.venc-sidebar{
+  font-size:10px;text-align:center;padding:4px 8px;border-radius:6px;
+  margin-top:6px;font-family:var(--mono);display:none;
+}
+.venc-sidebar.warn{display:block;background:var(--amberbg);color:var(--amber)}
+.venc-sidebar.expired{display:block;background:var(--redbg);color:var(--red)}
 #pe-toggle.pe-on #pe-lbl{color:var(--green)}
 #pe-toggle.pe-on #pe-switch{background:var(--greend)}
 #pe-toggle.pe-on #pe-knob{transform:translateX(14px)}
@@ -404,6 +427,7 @@ select.finp option{background:var(--bg2)}
           <div class="cupo-lbl"><span>Cupo de lotes</span><span class="cupo-val" id="cupo-val">–/–</span></div>
           <div class="cupo-bar"><div class="cupo-fill" id="cupo-fill" style="width:0%"></div></div>
           <div class="cupo-disp" id="cupo-disp">–</div>
+          <div class="venc-sidebar" id="venc-sidebar"></div>
         </div>
       </div>
       <div class="nav" style="margin-top:7px">
@@ -419,6 +443,10 @@ select.finp option{background:var(--bg2)}
   </aside>
 
   <main class="main">
+    <!-- Banner vencimiento -->
+    <div class="venc-banner" id="venc-banner">
+      <span id="venc-banner-txt"></span>
+    </div>
     <div class="topbar">
       <span class="topbar-title" id="topbar-title">Nueva operación</span>
       <div style="display:flex;align-items:center;gap:12px">
@@ -854,6 +882,37 @@ function renderUser(){
   else { b.textContent='STD'; b.className='uc-badge user'; }
   if (u.esAdmin) document.getElementById('th-email').style.display='table-cell';
   updateCupo(u.cupo, u.cupoUsado);
+  checkVencimiento(u);
+}
+
+function checkVencimiento(u) {
+  if (u.esAdmin) return; // admin nunca vence
+
+  const banner  = document.getElementById('venc-banner');
+  const bannerTxt = document.getElementById('venc-banner-txt');
+  const sidebar = document.getElementById('venc-sidebar');
+
+  if (u.suscripcionVencida) {
+    // Vencida
+    banner.className  = 'venc-banner expired';
+    bannerTxt.textContent = '⚠ Tu suscripción venció el ' + (u.vencimiento||'') + '. No podés crear ni imprimir hasta renovarla.';
+    sidebar.className = 'venc-sidebar expired';
+    sidebar.textContent = '⚠ Vencida el ' + (u.vencimiento||'');
+  } else if (u.diasRestantes !== null && u.diasRestantes <= 7) {
+    // Por vencer
+    const txt = u.diasRestantes === 0
+      ? 'Vence HOY'
+      : u.diasRestantes === 1
+        ? 'Vence mañana'
+        : 'Vence en ' + u.diasRestantes + ' días';
+    banner.className  = 'venc-banner warn';
+    bannerTxt.textContent = '⏳ ' + txt + ' (' + (u.vencimiento||'') + '). Contactá al administrador para renovar.';
+    sidebar.className = 'venc-sidebar warn';
+    sidebar.textContent = '⏳ ' + txt;
+  } else {
+    banner.className  = 'venc-banner';
+    sidebar.className = 'venc-sidebar';
+  }
 }
 function updateCupo(cupo,usado){
   const disp = cupo-usado, pct = cupo>0?Math.min(100,Math.round(usado/cupo*100)):0;
@@ -869,7 +928,14 @@ async function loadStats(){
   updateCupo(r.cupo,r.cupoUsado);
   const b = document.getElementById('badge-pend');
   if (r.pendiente>0){ b.textContent='Pendientes: '+r.pendiente; b.classList.add('show'); } else b.classList.remove('show');
-  if (SESSION){ SESSION.user.cupo=r.cupo; SESSION.user.cupoUsado=r.cupoUsado; localStorage.setItem('pg_sess',JSON.stringify(SESSION)); }
+  if (SESSION){
+    SESSION.user.cupo=r.cupo; SESSION.user.cupoUsado=r.cupoUsado;
+    if (r.vencimiento!==undefined)        SESSION.user.vencimiento=r.vencimiento;
+    if (r.suscripcionVencida!==undefined) SESSION.user.suscripcionVencida=r.suscripcionVencida;
+    if (r.diasRestantes!==undefined)      SESSION.user.diasRestantes=r.diasRestantes;
+    localStorage.setItem('pg_sess',JSON.stringify(SESSION));
+    checkVencimiento(SESSION.user);
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1106,6 +1172,9 @@ async function saveLote(){
   if (!CURR_SERIE.length){ toast('Completá los parámetros primero','err'); return; }
   const lote = readForm(); if (!lote) return;
 
+  if (!SESSION.user.esAdmin && SESSION.user.suscripcionVencida){
+    toast('Tu suscripción ha vencido. Contactá al administrador para renovarla.','err'); return;
+  }
   if (!SESSION.user.esAdmin && SESSION.user.cupoUsado >= SESSION.user.cupo){
     toast('Cupo agotado. Contactá al administrador.','err'); return;
   }
@@ -1461,6 +1530,9 @@ function mkPagareHTML(p){
 // ════════════════════════════════════════════════════════
 async function doPrint(){
   if (!CURR_LOTE||!CURR_SERIE.length) return;
+  if (!SESSION?.user?.esAdmin && SESSION?.user?.suscripcionVencida) {
+    toast('Tu suscripción ha vencido. No podés imprimir hasta renovarla.','err'); return;
+  }
   // PE: notificar por correo antes de imprimir
   if (PE_ACTIVE && CURR_LOTE?.orden) {
     const esDolar = CURR_LOTE.moneda==='USD';
