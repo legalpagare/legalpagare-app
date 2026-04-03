@@ -1128,7 +1128,7 @@ function setFilter(f,btn){
 }
 function filterTable(){
   const q=document.getElementById('search-inp').value.toLowerCase();
-  renderTable(ALL_LOTES.filter(l=>!q||l.deudor.toLowerCase().includes(q)||l.acreedor.toLowerCase().includes(q)||l.orden.includes(q)));
+  renderTable(ALL_LOTES.filter(l=>!q||(l.deudor||'').split('|||')[0].toLowerCase().includes(q)||(l.acreedor||'').toLowerCase().includes(q)||l.orden.includes(q)));
 }
 function renderTable(lotes){
   const tbody=document.getElementById('tbl-body');
@@ -1149,7 +1149,7 @@ function renderTable(lotes){
       <td>${esc(l.fecha)}</td>
       ${emailCol}
       <td>${mChip}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.deudor)}">${esc(l.deudor)}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc((l.deudor||'').split('|||')[0])}">${esc((l.deudor||'').split('|||')[0])}</td>
       <td class="mono">${l.cantCuotas}</td>
       <td class="mono">${simb} ${fmtN(l.montoTotal,dec)}</td>
       <td>${badge}</td>
