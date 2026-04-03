@@ -1448,7 +1448,7 @@ async function doPrint(){
 // ════════════════════════════════════════════════════════
 //  REPORTE EXCEL
 // ════════════════════════════════════════════════════════
-function generarExcel(){
+async function generarExcel(){
   if (!CURR_SERIE.length){ toast('No hay datos para exportar','err'); return; }
   const lote    = CURR_LOTE;
   const esDolar = lote.moneda==='USD';
@@ -1521,7 +1521,7 @@ function generarExcel(){
 // ════════════════════════════════════════════════════════
 //  REPORTE PDF (print)
 // ════════════════════════════════════════════════════════
-function generarReportePDF(){
+async function generarReportePDF(){
   if (!CURR_SERIE.length){ toast('No hay datos para exportar','err'); return; }
   const lote    = CURR_LOTE;
   const esDolar = lote.moneda==='USD';
