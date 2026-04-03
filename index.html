@@ -311,6 +311,12 @@ select.finp option{background:var(--bg2)}
 @keyframes slideIn{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
 .spin-inline{width:11px;height:11px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block}
 
+/* Privacidad Extrema */
+#pe-toggle.pe-on{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
+#pe-toggle.pe-on #pe-lbl{color:var(--green)}
+#pe-toggle.pe-on #pe-switch{background:var(--greend)}
+#pe-toggle.pe-on #pe-knob{transform:translateX(14px)}
+
 /* ═══════════════════════ PRINT ═══════════════════════ */
 #print-area{display:none}
 #report-print-area{display:none}
@@ -414,7 +420,19 @@ select.finp option{background:var(--bg2)}
   <main class="main">
     <div class="topbar">
       <span class="topbar-title" id="topbar-title">Nueva operación</span>
-      <div class="topbar-right" id="topbar-right"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <!-- Privacidad Extrema toggle -->
+        <div id="pe-toggle" onclick="togglePE()"
+             title="Privacidad Extrema — cuando está activa, toda la información se envía a tu correo"
+             style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);transition:all .2s;user-select:none">
+          <span style="font-size:13px">🔐</span>
+          <span id="pe-lbl" style="font-size:11px;font-weight:600;color:var(--text3);font-family:var(--mono)">Privacidad Extrema</span>
+          <div id="pe-switch" style="width:32px;height:18px;border-radius:9px;background:var(--border2);position:relative;transition:background .2s;flex-shrink:0">
+            <div id="pe-knob" style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>
+          </div>
+        </div>
+        <div class="topbar-right" id="topbar-right"></div>
+      </div>
     </div>
     <div class="content" id="content">
 
@@ -672,10 +690,11 @@ let SESSION    = null;
 let ALL_LOTES  = [];
 let FILTER     = 'TODOS';
 let CURR_LOTE  = null;
-let CURR_SERIE = [];          // array de {monto, vencimiento} calculado
-let MODO       = 'ci';        // ci | cf | fin
+let CURR_SERIE = [];
+let MODO       = 'ci';
 let SISTEMA    = 'FRANCES';
 let TIPO_TASA  = 'TNA';
+let PE_ACTIVE  = false;       // Privacidad Extrema — OFF por defecto
 
 // ════════════════════════════════════════════════════════
 //  INIT
@@ -1073,6 +1092,25 @@ async function saveLote(){
       const cupoRestante = (SESSION.user.cupo - SESSION.user.cupoUsado - 1);
       const cupoMsg = SESSION.user.esAdmin ? '' : ` — te quedan ${cupoRestante} crédito${cupoRestante!==1?'s':''}`;
       toast('✓ Operación #'+r.orden+' guardada'+cupoMsg,'ok');
+      // Privacidad Extrema: notificar por correo
+      if (PE_ACTIVE) {
+        const lote = readForm();
+        const esDolar = (lote?.moneda||'USD')==='USD';
+        const dec = esDolar?2:0;
+        const total = roundD(CURR_SERIE.reduce((a,x)=>a+x.monto,0),dec);
+        const simb = esDolar?'U$S':'$';
+        await api({
+          action   : 'sendPrivEmail',
+          token    : SESSION.token,
+          tipo     : 'guardado',
+          orden    : r.orden,
+          deudor   : (lote?.deudor||'').split('|||')[0],
+          cuotas   : CURR_SERIE.length,
+          monto    : simb+' '+fmtN(total,dec),
+          vtoIni   : fmtISODate(lote?.fechaVtoInic||'')
+        });
+        toast('📧 Resumen enviado a tu correo','inf');
+      }
       ALL_LOTES=[]; loadStats();
       setTimeout(()=>goTab('browser'),600);
     }
@@ -1369,8 +1407,24 @@ function mkPagareHTML(p){
 // ════════════════════════════════════════════════════════
 //  IMPRIMIR PAGARÉS
 // ════════════════════════════════════════════════════════
-function doPrint(){
+async function doPrint(){
   if (!CURR_LOTE||!CURR_SERIE.length) return;
+  // PE: notificar por correo antes de imprimir
+  if (PE_ACTIVE && CURR_LOTE?.orden) {
+    const esDolar = CURR_LOTE.moneda==='USD';
+    const dec = esDolar?2:0;
+    const simb = esDolar?'U$S':'$';
+    const total = roundD(CURR_SERIE.reduce((a,x)=>a+x.monto,0),dec);
+    api({
+      action : 'sendPrivEmail',
+      token  : SESSION.token,
+      tipo   : 'impresion',
+      orden  : CURR_LOTE.orden,
+      deudor : (CURR_LOTE.deudor||'').split('|||')[0],
+      cuotas : CURR_SERIE.length,
+      monto  : simb+' '+fmtN(total,dec)
+    });
+  }
   window.print();
   const isPend=CURR_LOTE.estado==='PENDIENTE', isSaved=!!CURR_LOTE.orden;
   if (isPend && isSaved){
@@ -1442,8 +1496,26 @@ function generarExcel(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagarés');
   const fname = 'Pagares_'+(lote.orden||'preview')+'_'+lote.deudor.replace(/\s+/g,'_').slice(0,20)+'.xlsx';
-  XLSX.writeFile(wb, fname);
-  toast('✓ Excel generado','ok');
+  if (PE_ACTIVE) {
+    // Convertir a base64 y enviar por correo
+    const wbout = XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+    showLoading('Enviando Excel a tu correo...');
+    const r2 = await api({
+      action   : 'sendPrivEmail',
+      token    : SESSION.token,
+      tipo     : 'excel',
+      orden    : CURR_LOTE?.orden||'preview',
+      deudor   : (CURR_LOTE?.deudor||'').split('|||')[0],
+      fileName : fname,
+      fileB64  : wbout
+    });
+    hideLoading();
+    if (r2.ok) toast('📧 Excel enviado a tu correo','ok');
+    else { XLSX.writeFile(wb, fname); toast('✓ Excel generado (correo falló)','inf'); }
+  } else {
+    XLSX.writeFile(wb, fname);
+    toast('✓ Excel generado','ok');
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1507,10 +1579,29 @@ function generarReportePDF(){
   const pa = document.getElementById('print-area');
   const prev = pa.style.display;
   pa.style.display = 'none';
-  window.print();
-  pa.style.display = prev;
-  document.getElementById('report-print-area').innerHTML='';
-  toast('✓ Reporte enviado a imprimir','ok');
+  if (PE_ACTIVE) {
+    // Capturar HTML del reporte y enviar por correo
+    const rptHtml = document.getElementById('report-print-area').innerHTML;
+    pa.style.display = prev;
+    document.getElementById('report-print-area').innerHTML='';
+    showLoading('Enviando reporte a tu correo...');
+    const r2 = await api({
+      action   : 'sendPrivEmail',
+      token    : SESSION.token,
+      tipo     : 'reporte',
+      orden    : CURR_LOTE?.orden||'preview',
+      deudor   : (CURR_LOTE?.deudor||'').split('|||')[0],
+      rptHtml  : rptHtml
+    });
+    hideLoading();
+    if (r2.ok) toast('📧 Reporte enviado a tu correo','ok');
+    else toast('Error al enviar el reporte','err');
+  } else {
+    window.print();
+    pa.style.display = prev;
+    document.getElementById('report-print-area').innerHTML='';
+    toast('✓ Reporte enviado a imprimir','ok');
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1594,6 +1685,20 @@ function n2l(n){
   if(n<1000000){const m=Math.floor(n/1000),r=n%1000;return r?n2l(m)+' mil '+n2l(r):n2l(m)+' mil';}
   if(n<1000000000){const m=Math.floor(n/1000000),r=n%1000000;const ms=m===1?'un millón':n2l(m)+' millones';return r?ms+' '+n2l(r):ms;}
   return n.toLocaleString('es-AR');
+}
+
+// ════════════════════════════════════════════════════════
+//  PRIVACIDAD EXTREMA
+// ════════════════════════════════════════════════════════
+function togglePE() {
+  PE_ACTIVE = !PE_ACTIVE;
+  const toggle = document.getElementById('pe-toggle');
+  toggle.classList.toggle('pe-on', PE_ACTIVE);
+  if (PE_ACTIVE) {
+    toast('🔐 Privacidad Extrema activada — toda la información se enviará a tu correo', 'ok');
+  } else {
+    toast('Privacidad Extrema desactivada', 'inf');
+  }
 }
 
 // ════════════════════════════════════════════════════════
