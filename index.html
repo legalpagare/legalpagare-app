@@ -315,6 +315,46 @@ select.finp option{background:var(--bg2)}
 /* Privacidad Extrema */
 #pe-toggle.pe-on{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
 
+/* ── ABM Usuarios ── */
+.abm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);z-index:1500;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.abm-overlay.show{display:flex}
+.abm-modal{background:var(--bg1);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:900px;margin:auto;box-shadow:0 32px 80px rgba(0,0,0,.5);overflow:hidden}
+.abm-head{padding:18px 24px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.abm-title{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
+.abm-close{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .15s}
+.abm-close:hover{color:var(--red);border-color:var(--red)}
+.abm-body{padding:20px 24px}
+/* Tabla ABM */
+.abm-tbl{width:100%;border-collapse:collapse;margin-bottom:20px}
+.abm-tbl th{background:var(--bg2);padding:8px 12px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:1px solid var(--border)}
+.abm-tbl td{padding:9px 12px;border-bottom:1px solid rgba(42,51,71,.4);font-size:11px;color:var(--text2);vertical-align:middle}
+.abm-tbl tr:last-child td{border-bottom:none}
+.abm-tbl tr:hover td{background:rgba(255,255,255,.02)}
+.abm-act{padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.abm-act:hover{border-color:var(--border2);color:var(--text)}
+.abm-act.edit:hover{border-color:var(--blue);color:var(--blue)}
+.abm-act.toggle-on{color:var(--green)}
+.abm-act.toggle-off{color:var(--red)}
+/* Formulario ABM */
+.abm-form{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:4px}
+.abm-form-title{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.abm-form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.abm-form-grid.wide{grid-template-columns:1fr 1fr 1fr 1fr 1fr}
+.abm-fg{display:flex;flex-direction:column;gap:4px}
+.abm-lbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.abm-inp{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:11px;outline:none;width:100%;transition:border-color .15s}
+.abm-inp:focus{border-color:var(--blue)}
+.abm-chk-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:4px}
+.abm-chk-row input{width:14px;height:14px;accent-color:var(--blue)}
+.abm-form-actions{display:flex;gap:8px;justify-content:flex-end}
+.abm-btn{padding:8px 18px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .15s;font-family:var(--font)}
+.abm-btn-save{background:var(--blue);color:#fff}
+.abm-btn-save:hover{filter:brightness(1.1)}
+.abm-btn-cancel{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.abm-btn-cancel:hover{color:var(--text)}
+.abm-btn-new{background:var(--bg3);color:var(--blue);border:1px solid rgba(59,130,246,.3);font-size:11px;padding:6px 14px}
+.abm-btn-new:hover{background:var(--bluebg)}
+
 /* Banner vencimiento */
 .venc-banner{
   padding:8px 20px;font-size:11px;font-weight:600;text-align:center;
@@ -450,6 +490,11 @@ select.finp option{background:var(--bg2)}
     <div class="topbar">
       <span class="topbar-title" id="topbar-title">Nueva operación</span>
       <div style="display:flex;align-items:center;gap:12px">
+        <!-- Botón ABM Usuarios (solo admin) -->
+        <button id="btn-abm-usuarios" onclick="openABM()"
+                style="display:none;padding:6px 13px;border-radius:7px;border:1px solid rgba(59,130,246,.3);background:var(--bluebg);color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s">
+          👥 Usuarios
+        </button>
         <!-- Privacidad Extrema toggle -->
         <div id="pe-toggle" onclick="togglePE()"
              title="Privacidad Extrema — cuando está activa, toda la información se envía a tu correo"
@@ -686,6 +731,71 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- ══ MODAL ABM USUARIOS ══ -->
+<div class="abm-overlay" id="abm-overlay">
+  <div class="abm-modal">
+    <div class="abm-head">
+      <span class="abm-title">👥 Gestión de Usuarios</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="abm-btn abm-btn-new" onclick="abrirFormNuevo()">+ Nuevo usuario</button>
+        <button class="abm-close" onclick="closeABM()">✕</button>
+      </div>
+    </div>
+    <div class="abm-body">
+
+      <!-- Tabla de usuarios -->
+      <div style="overflow-x:auto;border:1px solid var(--border);border-radius:9px;overflow:hidden">
+        <table class="abm-tbl" id="abm-tbl">
+          <thead>
+            <tr>
+              <th>Email</th><th>Nombre</th><th>Cupo</th><th>Usado</th>
+              <th>Plan</th><th>Admin</th><th>Estado</th><th>Vencimiento</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="abm-tbody">
+            <tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3)">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Formulario Alta/Edición -->
+      <div class="abm-form" id="abm-form" style="display:none">
+        <div class="abm-form-title" id="abm-form-title">✏ Editar usuario</div>
+        <input type="hidden" id="abm-fila"/>
+        <div class="abm-form-grid wide">
+          <div class="abm-fg">
+            <label class="abm-lbl">Email *</label>
+            <input class="abm-inp" id="abm-email" type="email" placeholder="usuario@gmail.com"/>
+          </div>
+          <div class="abm-fg">
+            <label class="abm-lbl">Nombre *</label>
+            <input class="abm-inp" id="abm-nombre" type="text" placeholder="Juan García"
+                   oninput="capitalizarInput(this)"/>
+          </div>
+          <div class="abm-fg">
+            <label class="abm-lbl">Cupo de lotes</label>
+            <input class="abm-inp" id="abm-cupo" type="number" min="0" placeholder="20"/>
+          </div>
+          <div class="abm-fg">
+            <label class="abm-lbl">Vencimiento</label>
+            <input class="abm-inp" id="abm-venc" type="date"/>
+          </div>
+          <div class="abm-fg" style="justify-content:flex-end;gap:8px">
+            <div class="abm-chk-row"><input type="checkbox" id="abm-pro"/><label for="abm-pro">Plan PRO</label></div>
+            <div class="abm-chk-row"><input type="checkbox" id="abm-admin"/><label for="abm-admin">Admin</label></div>
+            <div class="abm-chk-row"><input type="checkbox" id="abm-activo" checked/><label for="abm-activo">Activo</label></div>
+          </div>
+        </div>
+        <div class="abm-form-actions">
+          <button class="abm-btn abm-btn-cancel" onclick="cerrarForm()">Cancelar</button>
+          <button class="abm-btn abm-btn-save" onclick="guardarUsuario()">💾 Guardar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- Modal PRO upgrade -->
 <div class="overlay" id="pro-overlay">
   <div class="modal">
@@ -828,7 +938,13 @@ function showApp(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').classList.add('visible');
   renderUser(); loadStats(); goTab('nueva');
-  setTimeout(()=>{ const l=document.getElementById('fin-lock'); if(l) l.style.display=IS_PRO?'none':'inline'; },150);
+  setTimeout(()=>{
+    const l=document.getElementById('fin-lock');
+    if(l) l.style.display=IS_PRO?'none':'inline';
+    // Mostrar botón ABM solo para admin
+    const btnAbm=document.getElementById('btn-abm-usuarios');
+    if(btnAbm) btnAbm.style.display=SESSION?.user?.esAdmin?'inline-flex':'none';
+  },150);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1844,6 +1960,152 @@ function n2l(n){
   if(n<1000000){const m=Math.floor(n/1000),r=n%1000;return r?n2l(m)+' mil '+n2l(r):n2l(m)+' mil';}
   if(n<1000000000){const m=Math.floor(n/1000000),r=n%1000000;const ms=m===1?'un millón':n2l(m)+' millones';return r?ms+' '+n2l(r):ms;}
   return n.toLocaleString('es-AR');
+}
+
+// ════════════════════════════════════════════════════════
+//  ABM USUARIOS
+// ════════════════════════════════════════════════════════
+let _abmUsuarios = [];
+
+async function openABM() {
+  document.getElementById('abm-overlay').classList.add('show');
+  document.getElementById('abm-form').style.display = 'none';
+  await cargarUsuariosABM();
+}
+
+function closeABM() {
+  document.getElementById('abm-overlay').classList.remove('show');
+}
+
+async function cargarUsuariosABM() {
+  document.getElementById('abm-tbody').innerHTML =
+    '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3)">Cargando...</td></tr>';
+  const r = await api({ action:'getUsuarios', token:SESSION.token });
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  _abmUsuarios = r.usuarios;
+  renderABMTabla(r.usuarios);
+}
+
+function renderABMTabla(usuarios) {
+  const tbody = document.getElementById('abm-tbody');
+  if (!usuarios.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3)">Sin usuarios</td></tr>';
+    return;
+  }
+  tbody.innerHTML = usuarios.map(u => {
+    const planBadge = u.esAdmin
+      ? '<span style="font-size:9px;background:var(--goldbg);color:var(--gold);border:1px solid rgba(228,170,34,.2);padding:2px 7px;border-radius:8px;font-family:var(--mono)">ADMIN</span>'
+      : u.esPro
+        ? '<span style="font-size:9px;background:var(--bluebg);color:var(--blue);border:1px solid rgba(59,130,246,.2);padding:2px 7px;border-radius:8px;font-family:var(--mono)">PRO</span>'
+        : '<span style="font-size:9px;background:var(--bg3);color:var(--text3);border:1px solid var(--border);padding:2px 7px;border-radius:8px;font-family:var(--mono)">STD</span>';
+
+    const estadoBadge = u.activo
+      ? '<span style="color:var(--green);font-size:10px;font-weight:600">● Activo</span>'
+      : '<span style="color:var(--red);font-size:10px;font-weight:600">● Inactivo</span>';
+
+    const vencStr = u.vencimiento ? fmtISODate(u.vencimiento) : '—';
+    const hoy     = new Date(); hoy.setHours(0,0,0,0);
+    let vencStyle = '';
+    if (u.vencimiento) {
+      const vd = new Date(u.vencimiento); vd.setHours(0,0,0,0);
+      const diff = Math.ceil((vd-hoy)/(1000*60*60*24));
+      if (diff < 0) vencStyle = 'color:var(--red);font-weight:600';
+      else if (diff <= 7) vencStyle = 'color:var(--amber);font-weight:600';
+    }
+
+    const toggleBtn = u.esAdmin ? '' :
+      `<button class="abm-act ${u.activo?'toggle-on':'toggle-off'}"
+        onclick="toggleUsuario(${u.fila},'${esc(u.email)}')"
+        title="${u.activo?'Desactivar':'Activar'}">
+        ${u.activo?'⏸ Desactivar':'▶ Activar'}
+      </button>`;
+
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:10px">${esc(u.email)}</td>
+      <td style="font-weight:600;color:var(--text)">${esc(u.nombre)}</td>
+      <td style="font-family:var(--mono)">${u.cupo}</td>
+      <td style="font-family:var(--mono);color:var(--text3)">${u.cupoUsado}</td>
+      <td>${planBadge}</td>
+      <td style="text-align:center">${u.esAdmin?'✓':''}</td>
+      <td>${estadoBadge}</td>
+      <td style="${vencStyle}">${vencStr}</td>
+      <td style="white-space:nowrap;display:flex;gap:5px">
+        <button class="abm-act edit" onclick="abrirFormEditar(${u.fila})">✏ Editar</button>
+        ${toggleBtn}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirFormNuevo() {
+  document.getElementById('abm-form-title').textContent = '➕ Nuevo usuario';
+  document.getElementById('abm-fila').value  = '';
+  document.getElementById('abm-email').value = '';
+  document.getElementById('abm-nombre').value= '';
+  document.getElementById('abm-cupo').value  = '5';
+  document.getElementById('abm-venc').value  = '';
+  document.getElementById('abm-pro').checked    = false;
+  document.getElementById('abm-admin').checked  = false;
+  document.getElementById('abm-activo').checked = true;
+  document.getElementById('abm-email').disabled = false;
+  document.getElementById('abm-form').style.display = 'block';
+  document.getElementById('abm-email').focus();
+}
+
+function abrirFormEditar(fila) {
+  const u = _abmUsuarios.find(x => x.fila === fila);
+  if (!u) return;
+  document.getElementById('abm-form-title').textContent = '✏ Editar · ' + u.email;
+  document.getElementById('abm-fila').value   = fila;
+  document.getElementById('abm-email').value  = u.email;
+  document.getElementById('abm-nombre').value = u.nombre;
+  document.getElementById('abm-cupo').value   = u.cupo;
+  document.getElementById('abm-venc').value   = u.vencimiento||'';
+  document.getElementById('abm-pro').checked    = u.esPro;
+  document.getElementById('abm-admin').checked  = u.esAdmin;
+  document.getElementById('abm-activo').checked = u.activo;
+  document.getElementById('abm-email').disabled = true; // no cambiar email
+  document.getElementById('abm-form').style.display = 'block';
+  document.getElementById('abm-form').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function cerrarForm() {
+  document.getElementById('abm-form').style.display = 'none';
+}
+
+async function guardarUsuario() {
+  const fila   = document.getElementById('abm-fila').value;
+  const email  = document.getElementById('abm-email').value.trim();
+  const nombre = document.getElementById('abm-nombre').value.trim();
+  const cupo   = document.getElementById('abm-cupo').value;
+  const venc   = document.getElementById('abm-venc').value;
+  const esPro  = document.getElementById('abm-pro').checked;
+  const esAdmin= document.getElementById('abm-admin').checked;
+  const activo = document.getElementById('abm-activo').checked;
+
+  if (!email || !nombre) { toast('Email y nombre son obligatorios','err'); return; }
+
+  showLoading('Guardando...');
+  const r = await api({
+    action: 'saveUsuario', token: SESSION.token,
+    fila, email, nombre, cupo, esPro, esAdmin, activo,
+    vencimiento: venc
+  });
+  hideLoading();
+
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast('✓ Usuario '+(r.accion||'guardado')+' correctamente','ok');
+  cerrarForm();
+  await cargarUsuariosABM();
+}
+
+async function toggleUsuario(fila, email) {
+  showLoading('Actualizando...');
+  const r = await api({ action:'toggleUsuario', token:SESSION.token, fila, email });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast(r.nuevoEstado ? '✓ Usuario activado' : 'Usuario desactivado','inf');
+  await cargarUsuariosABM();
 }
 
 // ════════════════════════════════════════════════════════
