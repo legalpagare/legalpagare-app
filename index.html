@@ -663,25 +663,44 @@ select.finp option{background:var(--bg2)}
   <div class="modal">
     <div class="modal-icon">⭐</div>
     <div class="modal-title">Función exclusiva PRO</div>
-    <div class="modal-msg" id="pro-modal-msg">Esta función está disponible en el plan PRO.</div>
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px;text-align:left">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Plan PRO incluye</div>
-      <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text2)">
-        <div>📊 Sistema financiero Francés, Alemán y tasa fija</div>
-        <div>📄 Reporte PDF completo</div>
-        <div>💾 Backup completo de operaciones</div>
-        <div>♾️ Operaciones ilimitadas</div>
-        <div>📅 Historial ilimitado</div>
-        <div>✉️ Soporte email prioritario</div>
+
+    <!-- Paso 1: info -->
+    <div id="pro-step-info">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:14px;text-align:center">
+        <strong id="pro-feature-name" style="color:var(--blue)"></strong> está disponible en el plan PRO.
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:18px;text-align:left">
+        <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px">Plan PRO incluye</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text2)">
+          <div>📊 Sistema financiero Francés, Alemán y tasa fija</div>
+          <div>📄 Reporte PDF completo</div>
+          <div>💾 Backup completo de operaciones</div>
+          <div>♾️ Operaciones ilimitadas</div>
+          <div>📅 Historial ilimitado</div>
+          <div>✉️ Soporte email prioritario</div>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="mbtn mbtn-cancel" onclick="closeProModal()">Ahora no</button>
+        <button class="mbtn mbtn-confirm" id="pro-btn-request"
+                style="background:var(--blue)" onclick="sendUpgradeRequest()">
+          ⭐ Quiero el plan PRO
+        </button>
       </div>
     </div>
-    <div class="modal-btns">
-      <button class="mbtn mbtn-cancel" onclick="closeProModal()">Cerrar</button>
-      <button class="mbtn mbtn-confirm" style="background:var(--blue)"
-              onclick="closeProModal();window.open('mailto:info@tasks-on.com?subject=Upgrade%20a%20PRO','_blank')">
-        ✉ Solicitar PRO
+
+    <!-- Paso 2: confirmación -->
+    <div id="pro-step-ok" style="display:none;text-align:center;padding:10px 0">
+      <div style="font-size:36px;margin-bottom:12px">✅</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">¡Solicitud enviada!</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:20px">
+        Nos comunicaremos contigo a la brevedad<br>para activar tu plan PRO.
+      </div>
+      <button class="mbtn mbtn-confirm" style="background:var(--greend);width:100%" onclick="closeProModal()">
+        Perfecto, gracias
       </button>
     </div>
+
   </div>
 </div>
 
@@ -1658,15 +1677,35 @@ async function api(params){
 // ════════════════════════════════════════════════════════
 //  MODAL / LOADING / TOAST
 // ════════════════════════════════════════════════════════
-function showProModal(feature) {
-  const msgs = {
-    financiero: 'El sistema financiero (Francés, Alemán y tasa fija) está disponible en el plan PRO.',
-    reporte   : 'El reporte PDF completo está disponible en el plan PRO.',
-  };
-  document.getElementById('pro-modal-msg').textContent = msgs[feature]||'Esta función está disponible en el plan PRO.';
+async function showProModal(feature) {
+  document.getElementById('pro-feature-name').textContent = {
+    financiero: 'Sistema financiero',
+    reporte   : 'Reporte PDF completo',
+  }[feature] || feature;
   document.getElementById('pro-overlay').classList.add('show');
+  document.getElementById('pro-step-info').style.display = 'block';
+  document.getElementById('pro-step-ok').style.display   = 'none';
+  document.getElementById('pro-btn-request').dataset.feature = feature;
 }
-function closeProModal() { document.getElementById('pro-overlay').classList.remove('show'); }
+
+function closeProModal() {
+  document.getElementById('pro-overlay').classList.remove('show');
+}
+
+async function sendUpgradeRequest() {
+  const feature = document.getElementById('pro-btn-request').dataset.feature || '';
+  const btn = document.getElementById('pro-btn-request');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  await api({ action:'upgradeRequest', token:SESSION.token, feature });
+
+  // Mostrar confirmación
+  document.getElementById('pro-step-info').style.display = 'none';
+  document.getElementById('pro-step-ok').style.display   = 'block';
+  btn.disabled = false;
+  btn.textContent = '✓ Solicitud enviada';
+}
 
 let _modalCb=null;
 function showModal(icon,title,msg,onConfirm){
