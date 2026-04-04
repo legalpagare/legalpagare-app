@@ -551,6 +551,22 @@ select.finp option{background:var(--bg2)}
               <label class="flbl">Acreedor <span class="opt">(opcional — endosable)</span></label>
               <input class="finp" id="f-acreedor" type="text" placeholder="Dejar vacío si el pagaré es a la orden / endosable"/>
             </div>
+            <div class="fg">
+              <label class="flbl">Tipo documento <span class="opt">(deudor)</span></label>
+              <select class="finp" id="f-tdoc"><option value="">-- Sin especificar --</option></select>
+            </div>
+            <div class="fg">
+              <label class="flbl">N° documento <span class="opt">(deudor)</span></label>
+              <input class="finp" id="f-ndoc" type="text" placeholder="12.345.678"/>
+            </div>
+            <div class="fg">
+              <label class="flbl">Email deudor <span class="opt">🔐 PRO</span></label>
+              <input class="finp" id="f-email-deudor" type="email" placeholder="deudor@correo.com"/>
+            </div>
+            <div class="fg">
+              <label class="flbl">Email acreedor <span class="opt">🔐 PRO</span></label>
+              <input class="finp" id="f-email-acreedor" type="email" placeholder="acreedor@correo.com"/>
+            </div>
           </div>
         </div>
 
@@ -938,6 +954,7 @@ function showApp(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').classList.add('visible');
   renderUser(); loadStats(); goTab('nueva');
+  cargarTDocumentos();
   setTimeout(()=>{
     const l=document.getElementById('fin-lock');
     if(l) l.style.display=IS_PRO?'none':'inline';
@@ -1366,7 +1383,11 @@ function readForm(){
     deudor, acreedor:g('f-acreedor'), fechaVtoInic:vto, moneda:g('f-moneda'),
     lugarEmision:g('f-lugarEmis')||'Buenos Aires', fechaEmision:g('f-fechaEmis'),
     valRecibido:g('f-valRec'), lugarPago:g('f-lugarPago'),
-    modoCode: MODO==='ci'?'CUOTAS_IGUALES':MODO==='cf'?'CUOTA_FIJA':'FINANCIERO'
+    modoCode     : MODO==='ci'?'CUOTAS_IGUALES':MODO==='cf'?'CUOTA_FIJA':'FINANCIERO',
+    tipoDoc      : g('f-tdoc'),
+    nroDoc       : g('f-ndoc'),
+    emailDeudor  : g('f-email-deudor'),
+    emailAcreedor: g('f-email-acreedor')
   };
 
   if (MODO==='ci'){
@@ -1499,7 +1520,7 @@ function renderVista(lote, serie){
   const sheets   = chunk2(serie.map((s,i)=>mkPagareObj(s, i, n, lote)));
 
   const impNotice = !isPend && isSaved
-    ? `<span class="imp-notice">✓ Impreso el ${esc(lote.fechaImpresion)}</span>` : '';
+    ? `<span class="imp-notice">✓ Impreso el ${esc(lote.fechaImpresion)}${lote.hash?' &nbsp;·&nbsp; 🔐 '+lote.hash.slice(0,12)+'...':''}</span>` : '';
 
   const actBtns = isSaved
     ? (isPend
@@ -1569,7 +1590,8 @@ function mkPagareObj(s, i, total, lote){
     deudorDom     : (()=>{ const p=(lote.deudor||'').split('|||'); return p[1]||''; })(),
     deudorLoc     : (()=>{ const p=(lote.deudor||'').split('|||'); return p[2]||''; })(),
     valRecibido  : lote.valRecibido||'',
-    lugarPago    : lote.lugarPago||''
+    lugarPago    : lote.lugarPago||'',
+    hash         : lote.hash||''
   };
 }
 
@@ -1638,7 +1660,11 @@ function mkPagareHTML(p){
     </div>
   </div>
   <div class="pg-deco"></div>
-</div>`;
+  \${p.hash ? \`<div style="font-size:6px;font-family:monospace;color:#333;background:#f0f4f0;border-top:1px dashed #aaa;padding:3px 8px;display:flex;justify-content:space-between;gap:8px">
+    <span>🔐 Sello de Autenticidad LegalPagaré · \${p.hash.slice(0,40)}...</span>
+    <span style="flex-shrink:0">legalpagare.com/verificar</span>
+  </div>\` : ''}
+</div>\`;
 }
 
 // ════════════════════════════════════════════════════════
@@ -2106,6 +2132,23 @@ async function toggleUsuario(fila, email) {
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
   toast(r.nuevoEstado ? '✓ Usuario activado' : 'Usuario desactivado','inf');
   await cargarUsuariosABM();
+}
+
+// ════════════════════════════════════════════════════════
+//  TIPOS DE DOCUMENTO
+// ════════════════════════════════════════════════════════
+async function cargarTDocumentos() {
+  const r = await api({ action:'getTDocumentos', token:SESSION.token });
+  if (!r.ok) return;
+  const sel = document.getElementById('f-tdoc');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- Sin especificar --</option>';
+  r.tipos.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.sigla;
+    opt.textContent = t.sigla + ' — ' + t.nombre;
+    sel.appendChild(opt);
+  });
 }
 
 // ════════════════════════════════════════════════════════
