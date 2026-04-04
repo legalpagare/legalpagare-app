@@ -1688,20 +1688,28 @@ async function doPrint(){
       monto  : simb+' '+fmtN(total,dec)
     });
   }
-  window.print();
+  // El window.print() ahora se llama DENTRO del callback de markPrinted
+  // para asegurar que el hash ya esté en el DOM antes de imprimir
   const isPend=CURR_LOTE.estado==='PENDIENTE', isSaved=!!CURR_LOTE.orden;
   if (isPend && isSaved){
     const h=()=>{ window.removeEventListener('afterprint',h);
       showModal('✅','¿Marcar como entregado?',
         'Confirmá que el documento fue impreso y entregado al cliente.\nEsta acción no se puede deshacer.',
         async()=>{
-          closeModal(); showLoading('Marcando...');
+          closeModal(); showLoading('Generando Sello y marcando...');
           const r=await api({action:'markPrinted',token:SESSION.token,orden:CURR_LOTE.orden});
           hideLoading();
           if (!r.ok){toast('Error: '+r.error,'err');return;}
-          CURR_LOTE.estado='IMPRESO'; CURR_LOTE.fechaImpresion=new Date().toLocaleString('es-AR');
-          renderVista(CURR_LOTE,CURR_SERIE); ALL_LOTES=[]; loadStats();
-          toast('✓ Documento marcado como entregado','ok');
+          CURR_LOTE.estado='IMPRESO';
+          CURR_LOTE.fechaImpresion=new Date().toLocaleString('es-AR');
+          if (r.hash) CURR_LOTE.hash = r.hash;
+          // Re-renderizar con el hash ANTES de imprimir
+          renderVista(CURR_LOTE, CURR_SERIE);
+          await new Promise(res => setTimeout(res, 400));
+          window.print();
+          ALL_LOTES=[]; loadStats();
+          if (r.hash) toast('🔐 Sello de Autenticidad impreso y enviado por correo','ok');
+          else toast('✓ Documento marcado como entregado','ok');
         });
     };
     window.addEventListener('afterprint',h);
