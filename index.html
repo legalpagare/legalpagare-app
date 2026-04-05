@@ -389,12 +389,12 @@ select.finp option{background:var(--bg2)}
 @media print{
   @page{size:A4 landscape;margin:8mm 10mm}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .pagare{flex-shrink:0;flex-grow:0}
   .pg-sello{display:flex!important}
-  .pagare{max-height:94mm;overflow:hidden}
   html,body{background:#fff!important}
   #screen-login,#screen-app{display:none!important}
   #print-area,#report-print-area{display:block!important}
-  .print-sheet{width:100%;height:196mm;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3mm;page-break-after:always;break-after:page}
+  .print-sheet{width:100%;display:flex;flex-direction:column;gap:3mm;height:200mm;page-break-after:always;break-after:page}
   .print-sheet:last-child{page-break-after:avoid;break-after:avoid}
   .pagare{flex:1;max-height:94mm;overflow:hidden;border:5px solid #1a5c1a!important;background:#f6fdf4!important}
   .pg-deco{background:#2e7d32!important;height:10px}
