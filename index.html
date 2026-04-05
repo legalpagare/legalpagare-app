@@ -1846,6 +1846,18 @@ async function generarReportePDF(){
   pa.style.display = prev;
   document.getElementById('report-print-area').innerHTML='';
 
+  // Nombre de archivo automático: Op#_Deudor_Moneda_Total_FechaHora
+  const oldTitle = document.title;
+  if (lote?.orden) {
+    const deudorNom = (lote.deudor||'').split('|||')[0].trim().slice(0,20).replace(/\s+/g,'_');
+    const esDol = lote.moneda==='USD';
+    const tot   = roundD(CURR_SERIE.reduce((a,x)=>a+x.monto,0), esDol?2:0);
+    const simb2 = esDol?'USD':'ARS';
+    const ahora = new Date();
+    const ts    = String(ahora.getDate()).padStart(2,'0')+String(ahora.getMonth()+1).padStart(2,'0')+ahora.getFullYear()+'_'+String(ahora.getHours()).padStart(2,'0')+String(ahora.getMinutes()).padStart(2,'0');
+    document.title = 'Reporte_Op'+lote.orden+'_'+deudorNom+'_'+simb2+'_'+tot+'_'+ts;
+  }
+
   if (PE_ACTIVE && CURR_LOTE?.orden) {
     showLoading('Enviando reporte a tu correo...');
     const r2 = await api({
@@ -1862,6 +1874,7 @@ async function generarReportePDF(){
     window.print();
     toast('✓ Reporte enviado a imprimir','ok');
   }
+  document.title = oldTitle;
 }
 
 // ════════════════════════════════════════════════════════
