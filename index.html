@@ -388,9 +388,11 @@ select.finp option{background:var(--bg2)}
 /* Sello al pie: solo visible al imprimir */
 .pg-sello{ display:none; }
 @media print{
-  @page{size:A4 landscape;margin:8mm 10mm}
+  @page{size:A4 landscape;margin:6mm 8mm}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  .pagare{flex-shrink:0;flex-grow:0}
+  .pagare{flex-shrink:0;flex-grow:0;width:100%}
+  .pagare-wrap{width:100%}
+  .sheet-wrap{padding:0;box-shadow:none;border-radius:0}
   .pg-sello{display:flex!important}
   html,body{background:#fff!important}
   #screen-login,#screen-app{display:none!important}
@@ -1671,7 +1673,7 @@ function mkPagareHTML(p){
   </div>
   <div class="pg-sello" style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:1px 8px;justify-content:space-between;gap:8px">
     ${p.hash
-      ? '<span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,40) + '...</span><span style="white-space:nowrap">legalpagare.com/verificar</span>'
+      ? '<span style="flex:1;letter-spacing:.3px">🔐 Sello de Autenticidad LegalPagaré &nbsp;·&nbsp; ' + p.hash + '</span><span style="white-space:nowrap;padding-left:12px">legalpagare.com/verificar</span>'
       : ''}
   </div>
 </div>`;
