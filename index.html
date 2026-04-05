@@ -1558,10 +1558,7 @@ function renderVista(lote, serie){
     sheets.map(pair=>`<div class="print-sheet">${pair.map(p=>mkPagareHTML(p)).join('')}</div>`).join('');
 
   // Update topbar
-  const tr=document.getElementById('topbar-right'); tr.innerHTML='';
-  addTbtn(tr,'📊 Excel',generarExcel,'tbtn-green');
-  addTbtn(tr, IS_PRO?'📄 Reporte':'📄 Reporte ⭐', IS_PRO?generarReportePDF:()=>showProModal('reporte'));
-  addTbtn(tr,'🖨 Imprimir',doPrint,'tbtn-gold');
+  const tr=document.getElementById('topbar-right'); tr.innerHTML=''; // Acciones en botones de vista previa — no en topbar
 }
 
 function mkPagareObj(s, i, total, lote){
