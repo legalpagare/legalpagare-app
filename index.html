@@ -975,7 +975,7 @@ function showLogin(){ document.getElementById('screen-login').style.display='fle
 function showApp(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').classList.add('visible');
-  renderUser(); loadStats(); goTab('nueva');
+  renderUser(); loadStats(); goTab('browser');
   cargarTDocumentos();
   setTimeout(()=>{
     const l=document.getElementById('fin-lock');
