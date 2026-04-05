@@ -384,9 +384,12 @@ select.finp option{background:var(--bg2)}
 /* ═══════════════════════ PRINT ═══════════════════════ */
 #print-area{display:none}
 #report-print-area{display:none}
+/* Sello al pie: solo visible al imprimir */
+.pg-sello{ display:none; }
 @media print{
   @page{size:A4 landscape;margin:8mm 10mm}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .pg-sello{display:flex!important}
   html,body{background:#fff!important}
   #screen-login,#screen-app{display:none!important}
   #print-area,#report-print-area{display:block!important}
@@ -1656,13 +1659,13 @@ function mkPagareHTML(p){
           </div>
           ${p.hash
             ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=44x44&margin=2&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0" alt="QR"/>'
-            : '<div style=\"width:44px;height:44px;flex-shrink:0;border:1px dashed #c5dfc5;border-radius:3px;background:#f9fdf9;display:flex;align-items:center;justify-content:center\"><span style=\"font-size:5.5px;color:#bbb;font-family:Arial;text-align:center;line-height:1.4;padding:2px\">QR<br>al<br>entregar</span></div>'}
+            : ''}
         </div>
       </div>
     </div>
   </div>
   <div class="pg-deco"></div>
-  <div style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:1px 8px;display:flex;justify-content:space-between;gap:8px">
+  <div class="pg-sello" style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:1px 8px;display:flex;justify-content:space-between;gap:8px">
     ${p.hash
       ? '<span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,40) + '...</span><span style="white-space:nowrap">legalpagare.com/verificar</span>'
       : '<span>🔐 Sello de Autenticidad LegalPagaré · pendiente de entrega</span><span style="white-space:nowrap">legalpagare.com</span>'}
