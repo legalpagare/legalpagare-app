@@ -1675,7 +1675,7 @@ function mkPagareHTML(p){
             <div style="border-bottom:1px solid #555;min-height:9px"></div>
           </div>
           ${p.hash
-            ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=44x44&margin=2&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0" alt="QR"/>'
+            ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0;image-rendering:crisp-edges" alt="QR"/>'
             : ''}
         </div>
       </div>
