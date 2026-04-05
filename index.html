@@ -1669,47 +1669,56 @@ async function doPrint(){
   if (!SESSION?.user?.esAdmin && SESSION?.user?.suscripcionVencida) {
     toast('Tu suscripción ha vencido. No podés imprimir hasta renovarla.','err'); return;
   }
-  // PE: notificar por correo antes de imprimir
-  if (PE_ACTIVE && CURR_LOTE?.orden) {
-    const esDolar = CURR_LOTE.moneda==='USD';
-    const dec = esDolar?2:0;
-    const simb = esDolar?'U$S':'$';
-    const total = roundD(CURR_SERIE.reduce((a,x)=>a+x.monto,0),dec);
-    api({
-      action : 'sendPrivEmail',
-      token  : SESSION.token,
-      tipo   : 'impresion',
-      orden  : CURR_LOTE.orden,
-      deudor : (CURR_LOTE.deudor||'').split('|||')[0],
-      cuotas : CURR_SERIE.length,
-      monto  : simb+' '+fmtN(total,dec)
-    });
-  }
-  // El window.print() ahora se llama DENTRO del callback de markPrinted
-  // para asegurar que el hash ya esté en el DOM antes de imprimir
-  const isPend=CURR_LOTE.estado==='PENDIENTE', isSaved=!!CURR_LOTE.orden;
-  if (isPend && isSaved){
-    const h=()=>{ window.removeEventListener('afterprint',h);
-      showModal('✅','¿Marcar como entregado?',
-        'Confirmá que el documento fue impreso y entregado al cliente.\nEsta acción no se puede deshacer.',
-        async()=>{
-          closeModal(); showLoading('Generando Sello y marcando...');
-          const r=await api({action:'markPrinted',token:SESSION.token,orden:CURR_LOTE.orden});
-          hideLoading();
-          if (!r.ok){toast('Error: '+r.error,'err');return;}
-          CURR_LOTE.estado='IMPRESO';
-          CURR_LOTE.fechaImpresion=new Date().toLocaleString('es-AR');
-          if (r.hash) CURR_LOTE.hash = r.hash;
-          // Re-renderizar con el hash ANTES de imprimir
-          renderVista(CURR_LOTE, CURR_SERIE);
-          await new Promise(res => setTimeout(res, 400));
-          window.print();
-          ALL_LOTES=[]; loadStats();
-          if (r.hash) toast('🔐 Sello de Autenticidad impreso y enviado por correo','ok');
-          else toast('✓ Documento marcado como entregado','ok');
-        });
-    };
-    window.addEventListener('afterprint',h);
+
+  const isPend  = CURR_LOTE.estado==='PENDIENTE';
+  const isSaved = !!CURR_LOTE.orden;
+
+  if (isPend && isSaved) {
+    // PENDIENTE: confirmar → sello → renderizar con hash → imprimir
+    showModal('🖨','Imprimir y entregar',
+      'Al confirmar se generará el Sello de Autenticidad, se enviará por correo y se marcará como entregado.',
+      async()=>{
+        closeModal();
+        showLoading('Generando Sello y marcando...');
+        const r = await api({ action:'markPrinted', token:SESSION.token, orden:CURR_LOTE.orden });
+        hideLoading();
+        if (!r.ok){ toast('Error: '+r.error,'err'); return; }
+        CURR_LOTE.estado         = 'IMPRESO';
+        CURR_LOTE.fechaImpresion = new Date().toLocaleString('es-AR');
+        if (r.hash) CURR_LOTE.hash = r.hash;
+        if (PE_ACTIVE) {
+          const esDolar = CURR_LOTE.moneda==='USD';
+          const dec = esDolar?2:0;
+          const simb = esDolar?'U$S':'$';
+          const total = roundD(CURR_SERIE.reduce((a,x)=>a+x.monto,0),dec);
+          api({ action:'sendPrivEmail', token:SESSION.token, tipo:'impresion',
+                orden:CURR_LOTE.orden, deudor:(CURR_LOTE.deudor||'').split('|||')[0],
+                cuotas:CURR_SERIE.length, monto:simb+' '+fmtN(total,dec) });
+        }
+        // Nombre automático para el PDF: Op#_Deudor_FechaHora
+        const deudorNom = (CURR_LOTE.deudor||'').split('|||')[0].trim().slice(0,20).replace(/\s+/g,'_');
+        const ahora = new Date();
+        const ts = String(ahora.getDate()).padStart(2,'0')+String(ahora.getMonth()+1).padStart(2,'0')+ahora.getFullYear()+'_'+String(ahora.getHours()).padStart(2,'0')+String(ahora.getMinutes()).padStart(2,'0');
+        const oldTitle = document.title;
+        document.title = 'Pagares_Op'+CURR_LOTE.orden+'_'+deudorNom+'_'+ts;
+        // Re-renderizar con hash en el DOM ANTES de imprimir
+        renderVista(CURR_LOTE, CURR_SERIE);
+        await new Promise(res => setTimeout(res, 400));
+        window.print();
+        document.title = oldTitle;
+        ALL_LOTES=[]; loadStats();
+        if (r.hash) toast('🔐 Sello impreso y enviado a las partes','ok');
+        else        toast('✓ Documento marcado como entregado','ok');
+      });
+  } else {
+    // Ya IMPRESO: solo imprimir de nuevo
+    const deudorNom = (CURR_LOTE.deudor||'').split('|||')[0].trim().slice(0,20).replace(/\s+/g,'_');
+    const ahora = new Date();
+    const ts = String(ahora.getDate()).padStart(2,'0')+String(ahora.getMonth()+1).padStart(2,'0')+ahora.getFullYear()+'_'+String(ahora.getHours()).padStart(2,'0')+String(ahora.getMinutes()).padStart(2,'0');
+    const oldTitle = document.title;
+    document.title = 'Pagares_Op'+CURR_LOTE.orden+'_'+deudorNom+'_'+ts;
+    window.print();
+    document.title = oldTitle;
   }
 }
 
@@ -1763,7 +1772,8 @@ async function generarExcel(){
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagarés');
-  const fname = 'Pagares_'+(lote.orden||'preview')+'_'+lote.deudor.replace(/\s+/g,'_').slice(0,20)+'.xlsx';
+  const deudorExcel = (lote.deudor||'').split('|||')[0].trim().replace(/\s+/g,'_').replace(/_+/g,'_').slice(0,20);
+  const fname = 'Pagares_'+(lote.orden||'')+'_'+deudorExcel+'.xlsx';
   if (PE_ACTIVE && CURR_LOTE?.orden) {
     showLoading('Enviando reporte a tu correo...');
     const r2 = await api({
@@ -1871,10 +1881,12 @@ async function generarReportePDF(){
     if (r2.ok) toast('📧 Reporte enviado a tu correo','ok');
     else toast('Error al enviar el reporte','err');
   } else {
+    // Forzar nombre de archivo via print CSS title
     window.print();
-    toast('✓ Reporte enviado a imprimir','ok');
+    toast('✓ Reporte PDF enviado a imprimir','ok');
   }
-  document.title = oldTitle;
+  // Restaurar título con pequeña demora para que el browser lo registre
+  setTimeout(()=>{ document.title = oldTitle; }, 2000);
 }
 
 // ════════════════════════════════════════════════════════
