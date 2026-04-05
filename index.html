@@ -1662,21 +1662,22 @@ function mkPagareHTML(p){
     <div class="pg-bottom">
       <div style="display:flex;gap:0;align-items:stretch">
         <div style="flex:1.4;display:flex;flex-direction:column;gap:2px;padding-right:8px">
-          <div class="pg-brow"><span class="pg-blbl">Nombre</span><div class="pg-bline" style="padding-left:3px;font-size:9px;font-family:Arial;font-weight:600">${esc(p.deudorNombre)}</div></div>
+          <div class="pg-brow"><span class="pg-blbl">Nombre y Apellido</span><div class="pg-bline" style="padding-left:3px;font-size:9px;font-family:Arial;font-weight:600">${esc(p.deudorNombre)}</div></div>
           <div class="pg-brow"><span class="pg-blbl">Calle</span><div class="pg-bline" style="padding-left:3px;font-size:9px;font-family:Arial">${esc(p.deudorDom)}</div></div>
           <div class="pg-brow" style="gap:5px">
             <span class="pg-blbl">Loc.</span><div class="pg-bline" style="flex:2.2;padding-left:3px;font-size:8px;font-family:Arial">${esc(p.deudorLoc)}</div>
             <span class="pg-blbl">Tel.</span><div class="pg-bline" style="flex:1"></div>
           </div>
+          ${p.tipoDoc ? '<div class="pg-brow" style="gap:5px"><span class="pg-blbl">Tipo Doc.</span><div class="pg-bline" style="flex:1;padding-left:3px;font-size:8px;font-family:Arial">' + esc(p.tipoDoc) + '</div><span class="pg-blbl">N° Doc.</span><div class="pg-bline" style="flex:2;padding-left:3px;font-size:8px;font-family:Arial">' + esc(p.nroDoc) + '</div></div>' : ''}
         </div>
-        <div style="flex:1;border-left:1px solid #c5dfc5;padding-left:8px;display:flex;flex-direction:row;gap:5px;align-items:stretch">
+        <div style="flex:.7;border-left:1px solid #c5dfc5;padding-left:8px;display:flex;flex-direction:row;gap:5px;align-items:stretch">
           <div style="flex:1;display:flex;flex-direction:column;gap:2px">
             <div style="font-size:7px;font-family:Arial;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Firma y aclaración</div>
             <div style="flex:1;border-bottom:1px solid #555;min-height:16px"></div>
             <div style="border-bottom:1px solid #555;min-height:9px"></div>
           </div>
           ${p.hash
-            ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0;image-rendering:crisp-edges" alt="QR"/>'
+            ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=4&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="88" height="88" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0;image-rendering:crisp-edges" alt="QR"/>'
             : ''}
         </div>
       </div>
