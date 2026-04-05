@@ -388,18 +388,30 @@ select.finp option{background:var(--bg2)}
 /* Sello al pie: solo visible al imprimir */
 .pg-sello{ display:none; }
 @media print{
-  @page{size:A4 landscape;margin:6mm 8mm}
+  @page{size:A4 landscape;margin:5mm 6mm}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  .pagare{flex-shrink:0;flex-grow:0;width:100%}
-  .pagare-wrap{width:100%}
-  .sheet-wrap{padding:0;box-shadow:none;border-radius:0}
-  .pg-sello{display:flex!important}
-  html,body{background:#fff!important}
+  html,body{background:#fff!important;margin:0;padding:0;width:100%}
   #screen-login,#screen-app{display:none!important}
-  #print-area,#report-print-area{display:block!important}
-  .print-sheet{width:100%;display:flex;flex-direction:column;gap:3mm;height:200mm;page-break-after:always;break-after:page}
+  #print-area,#report-print-area{display:block!important;width:100%}
+  /* Cada hoja = 1 página A4 landscape */
+  .print-sheet{
+    width:100%;
+    display:flex;flex-direction:column;
+    gap:2mm;
+    page-break-after:always;break-after:page;
+    page-break-inside:avoid;
+  }
   .print-sheet:last-child{page-break-after:avoid;break-after:avoid}
-  .pagare{flex:1;max-height:94mm;overflow:hidden;border:5px solid #1a5c1a!important;background:#f6fdf4!important}
+  .sheet-wrap{padding:0!important;box-shadow:none!important;border-radius:0!important;width:100%!important}
+  /* Pagaré ocupa el ancho completo, altura natural */
+  .pagare-wrap{width:100%}
+  .pagare{
+    width:100%;
+    flex-shrink:0;flex-grow:0;
+    border:5px solid #1a5c1a!important;
+    background:#f6fdf4!important;
+  }
+  .pg-sello{display:flex!important}
   .pg-deco{background:#2e7d32!important;height:10px}
   /* Report print */
   .rpt-sheet{page-break-after:always;break-after:page;font-family:Arial,sans-serif;padding:10mm}
