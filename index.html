@@ -1557,6 +1557,22 @@ function renderVista(lote, serie){
   document.getElementById('print-area').innerHTML=
     sheets.map(pair=>`<div class="print-sheet">${pair.map(p=>mkPagareHTML(p)).join('')}</div>`).join('');
 
+  // Generar QR en cada pagaré si tiene hash
+  if (lote && lote.hash && typeof QRCode !== 'undefined') {
+    const verifyUrl = 'https://legalpagare.com/verificar?h=' + lote.hash;
+    setTimeout(()=>{
+      document.querySelectorAll('[data-qr-hash]').forEach(el => {
+        const h = el.dataset.qrHash;
+        if (h && !el.dataset.done && el.children.length === 0) {
+          el.dataset.done = '1';
+          new QRCode(el, { text:'https://legalpagare.com/verificar?h='+h,
+            width:50, height:50, colorDark:'#1a2744', colorLight:'#ffffff',
+            correctLevel: QRCode.CorrectLevel.M });
+        }
+      });
+    }, 100);
+  }
+
   // Update topbar
   const tr=document.getElementById('topbar-right'); tr.innerHTML=''; // Acciones en botones de vista previa — no en topbar
 }
@@ -1648,16 +1664,25 @@ function mkPagareHTML(p){
             <span class="pg-blbl">Tel.</span><div class="pg-bline" style="flex:1"></div>
           </div>
         </div>
-        <div style="flex:1;border-left:1px solid #c5dfc5;padding-left:8px;display:flex;flex-direction:column;justify-content:flex-start;gap:2px">
-          <div style="font-size:7px;font-family:Arial;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Firma y aclaración</div>
-          <div style="flex:1;border-bottom:1px solid #555;min-height:16px"></div>
-          <div style="border-bottom:1px solid #555;min-height:9px"></div>
+        <div style="flex:1;border-left:1px solid #c5dfc5;padding-left:8px;display:flex;flex-direction:row;gap:5px;align-items:stretch">
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:7px;font-family:Arial;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Firma y aclaración</div>
+            <div style="flex:1;border-bottom:1px solid #555;min-height:16px"></div>
+            <div style="border-bottom:1px solid #555;min-height:9px"></div>
+          </div>
+          <div data-qr-hash="${p.hash||''}" data-qr-num="${p.num}" style="width:52px;height:52px;flex-shrink:0;border:1px solid #c5dfc5;border-radius:3px;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            ${p.hash ? '' : '<span style="font-size:5.5px;color:#bbb;font-family:Arial;text-align:center;line-height:1.3;padding:2px">QR<br>al<br>entregar</span>'}
+          </div>
         </div>
       </div>
     </div>
   </div>
   <div class="pg-deco"></div>
-  ${p.hash ? '<div style="font-size:6px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:3px 8px;display:flex;justify-content:space-between;gap:8px"><span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,32) + '...</span><span>legalpagare.com/verificar</span></div>' : ''}
+  <div style="font-size:6px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:3px 8px;display:flex;justify-content:space-between;gap:8px">
+    ${p.hash
+      ? '<span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,40) + '...</span><span style="white-space:nowrap">legalpagare.com/verificar</span>'
+      : '<span>🔐 Sello de Autenticidad LegalPagaré · pendiente de entrega</span><span style="white-space:nowrap">legalpagare.com</span>'}
+  </div>
 </div>`;
 }
 
