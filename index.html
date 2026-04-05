@@ -253,6 +253,7 @@ select.finp option{background:var(--bg2)}
 /* Pagaré */
 .sheet-wrap{background:#fff;border-radius:6px;box-shadow:0 8px 28px rgba(0,0,0,.5);overflow:hidden;padding:11px 11px 9px;display:flex;flex-direction:column;gap:7px;margin-bottom:20px;max-width:900px}
 .sheet-lbl{font-size:9px;color:#aaa;text-align:right;font-family:monospace;margin-bottom:-2px}
+.pagare-wrap{width:100%;display:flex;flex-direction:column}
 .pagare{width:100%;background:var(--pg-bg);border:5px solid var(--pg-border);position:relative;font-family:Georgia,'Times New Roman',serif;color:#111;flex-shrink:0}
 .pagare::after{content:'';position:absolute;inset:5px;border:1px solid var(--pg-inner);pointer-events:none;z-index:2}
 .pg-deco{background:var(--pg-deco);height:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
@@ -1597,7 +1598,8 @@ function mkPagareObj(s, i, total, lote){
 }
 
 function mkPagareHTML(p){
-  return `<div class="pagare">
+  return `<div class="pagare-wrap">
+  <div class="pagare">
   <div class="pg-deco"></div>
   <div class="pg-body">
     <div class="pg-r1">
@@ -1666,10 +1668,11 @@ function mkPagareHTML(p){
     </div>
   </div>
   <div class="pg-deco"></div>
+  </div>
   <div class="pg-sello" style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:1px 8px;justify-content:space-between;gap:8px">
     ${p.hash
       ? '<span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,40) + '...</span><span style="white-space:nowrap">legalpagare.com/verificar</span>'
-      : '<span>🔐 Sello de Autenticidad LegalPagaré · pendiente de entrega</span><span style="white-space:nowrap">legalpagare.com</span>'}
+      : ''}
   </div>
 </div>`;
 }
