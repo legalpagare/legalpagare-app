@@ -257,7 +257,7 @@ select.finp option{background:var(--bg2)}
 .pagare::after{content:'';position:absolute;inset:5px;border:1px solid var(--pg-inner);pointer-events:none;z-index:2}
 .pg-deco{background:var(--pg-deco);height:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
 .pg-deco::before{content:'❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧ ✿ ❧';color:#a5d6a7;font-size:7px;letter-spacing:3px;white-space:nowrap}
-.pg-body{padding:5px 13px 5px}
+.pg-body{padding:4px 13px 4px}
 .pg-r1{display:flex;align-items:flex-end;gap:7px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #c5dfc5}
 .pg-field{display:flex;flex-direction:column}
 .pg-lbl{font-size:7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Arial,sans-serif;color:#444;line-height:1.2}
@@ -390,7 +390,7 @@ select.finp option{background:var(--bg2)}
   html,body{background:#fff!important}
   #screen-login,#screen-app{display:none!important}
   #print-area,#report-print-area{display:block!important}
-  .print-sheet{width:100%;height:192mm;display:flex;flex-direction:column;gap:4mm;page-break-after:always;break-after:page}
+  .print-sheet{width:100%;height:196mm;display:flex;flex-direction:column;gap:3mm;page-break-after:always;break-after:page}
   .print-sheet:last-child{page-break-after:avoid;break-after:avoid}
   .pagare{flex:1;max-height:94mm;overflow:hidden;border:5px solid #1a5c1a!important;background:#f6fdf4!important}
   .pg-deco{background:#2e7d32!important;height:10px}
@@ -1655,14 +1655,14 @@ function mkPagareHTML(p){
             <div style="border-bottom:1px solid #555;min-height:9px"></div>
           </div>
           ${p.hash
-            ? '<img src="https://chart.googleapis.com/chart?cht=qr&chs=44x44&chld=M|1&chl=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0" alt="QR"/>'
+            ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=44x44&margin=2&data=' + encodeURIComponent('https://legalpagare.com/verificar?h=' + p.hash) + '" width="44" height="44" style="border:1px solid #c5dfc5;border-radius:3px;display:block;flex-shrink:0" alt="QR"/>'
             : '<div style=\"width:44px;height:44px;flex-shrink:0;border:1px dashed #c5dfc5;border-radius:3px;background:#f9fdf9;display:flex;align-items:center;justify-content:center\"><span style=\"font-size:5.5px;color:#bbb;font-family:Arial;text-align:center;line-height:1.4;padding:2px\">QR<br>al<br>entregar</span></div>'}
         </div>
       </div>
     </div>
   </div>
   <div class="pg-deco"></div>
-  <div style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:2px 8px;display:flex;justify-content:space-between;gap:8px">
+  <div style="font-size:5.5px;font-family:monospace;color:#1a2744;background:#f0f4f0;border-top:1px dashed #aaa;padding:1px 8px;display:flex;justify-content:space-between;gap:8px">
     ${p.hash
       ? '<span>🔐 Sello LegalPagaré · ' + p.hash.slice(0,40) + '...</span><span style="white-space:nowrap">legalpagare.com/verificar</span>'
       : '<span>🔐 Sello de Autenticidad LegalPagaré · pendiente de entrega</span><span style="white-space:nowrap">legalpagare.com</span>'}
