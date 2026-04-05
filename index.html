@@ -385,74 +385,52 @@ select.finp option{background:var(--bg2)}
 /* ═══════════════════════ PRINT ═══════════════════════ */
 #print-area{display:none}
 #report-print-area{display:none}
-
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 8mm 8mm; 
+/* Sello al pie: solo visible al imprimir */
+.pg-sello{ display:none; }
+@media print{
+  @page{size:A4 landscape;margin:5mm 6mm}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  html,body{background:#fff!important;margin:0;padding:0;width:100%}
+  #screen-login,#screen-app{display:none!important}
+  #print-area,#report-print-area{display:block!important;width:100%}
+  /* Cada hoja = 1 página A4 landscape */
+  .print-sheet{
+    width:100%;
+    display:flex;flex-direction:column;
+    gap:2mm;
+    page-break-after:always;break-after:page;
+    page-break-inside:avoid;
   }
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  .print-sheet:last-child{page-break-after:avoid;break-after:avoid}
+  .sheet-wrap{padding:0!important;box-shadow:none!important;border-radius:0!important;width:100%!important}
+  /* Pagaré ocupa el ancho completo, altura natural */
+  .pagare-wrap{width:100%}
+  .pagare{
+    width:100%;
+    flex-shrink:0;flex-grow:0;
+    border:5px solid #1a5c1a!important;
+    background:#f6fdf4!important;
   }
-  html, body {
-    background: #fff !important;
-    margin: 0;
-    padding: 0;
-    width: 100%;
-  }
-  #screen-login, #screen-app { display: none !important; }
-  #print-area, #report-print-area { display: block !important; width: 100%; }
-
-  .print-sheet {
-    width: 100% !important;
-    height: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10mm; 
-    page-break-after: always;
-    break-after: page;
-    page-break-inside: avoid;
-  }
-  .print-sheet:last-child { page-break-after: avoid; break-after: avoid; }
-
-  .sheet-wrap {
-    padding: 0 !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    width: 100% !important;
-    max-width: none !important; 
-  }
-  .pagare-wrap {
-    width: 100% !important;
-    margin: 0 !important;
-  }
-  .pagare {
-    width: 100% !important; 
-    box-sizing: border-box;
-    border: 5px solid #1a5c1a !important;
-    background: #f6fdf4 !important;
-  }
-  .pg-sello { display: flex !important; }
-  .pg-deco { background: #2e7d32 !important; height: 10px; }
-
+  .pg-sello{display:flex!important}
+  .pg-deco{background:#2e7d32!important;height:10px}
   /* Report print */
-  .rpt-sheet { page-break-after: always; break-after: page; font-family: Arial, sans-serif; padding: 10mm; }
-  .rpt-sheet:last-child { page-break-after: avoid; break-after: avoid; }
-  .rpt-head { margin-bottom: 8mm; border-bottom: 2px solid #1a5c1a; padding-bottom: 4mm; }
-  .rpt-title { font-size: 18px; font-weight: 700; color: #1a5c1a; }
-  .rpt-meta { font-size: 10px; color: #555; margin-top: 3px; line-height: 1.6; }
-  .rpt-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .rpt-tbl th { background: #1a5c1a; color: #fff; padding: 6px 10px; text-align: left; }
-  .rpt-tbl td { padding: 5px 10px; border-bottom: 1px solid #ddd; }
-  .rpt-tbl tr:nth-child(even) td { background: #f9fdf9; }
-  .rpt-tbl .num { text-align: right; font-family: monospace; }
-  .rpt-foot { margin-top: 6mm; border-top: 1px solid #aaa; padding-top: 3mm; font-size: 10px; color: #777; display: flex; justify-content: space-between; }
+  .rpt-sheet{page-break-after:always;break-after:page;font-family:Arial,sans-serif;padding:10mm}
+  .rpt-sheet:last-child{page-break-after:avoid;break-after:avoid}
+  .rpt-head{margin-bottom:8mm;border-bottom:2px solid #1a5c1a;padding-bottom:4mm}
+  .rpt-title{font-size:18px;font-weight:700;color:#1a5c1a}
+  .rpt-meta{font-size:10px;color:#555;margin-top:3px;line-height:1.6}
+  .rpt-tbl{width:100%;border-collapse:collapse;font-size:11px}
+  .rpt-tbl th{background:#1a5c1a;color:#fff;padding:6px 10px;text-align:left}
+  .rpt-tbl td{padding:5px 10px;border-bottom:1px solid #ddd}
+  .rpt-tbl tr:nth-child(even) td{background:#f9fdf9}
+  .rpt-tbl .num{text-align:right;font-family:monospace}
+  .rpt-foot{margin-top:6mm;border-top:1px solid #aaa;padding-top:3mm;font-size:10px;color:#777;display:flex;justify-content:space-between}
 }
 </style>
 </head>
 <body>
 
+<!-- ═══════════════════════ LOGIN ═══════════════════════ -->
 <div id="screen-login">
   <div class="login-card">
     <div class="login-head">
@@ -488,6 +466,7 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- ═══════════════════════ APP ═══════════════════════ -->
 <div id="screen-app">
   <aside class="sidebar">
     <div class="brand">
@@ -523,16 +502,19 @@ select.finp option{background:var(--bg2)}
   </aside>
 
   <main class="main">
+    <!-- Banner vencimiento -->
     <div class="venc-banner" id="venc-banner">
       <span id="venc-banner-txt"></span>
     </div>
     <div class="topbar">
       <span class="topbar-title" id="topbar-title">Nueva operación</span>
       <div style="display:flex;align-items:center;gap:12px">
+        <!-- Botón ABM Usuarios (solo admin) -->
         <button id="btn-abm-usuarios" onclick="openABM()"
                 style="display:none;padding:6px 13px;border-radius:7px;border:1px solid rgba(59,130,246,.3);background:var(--bluebg);color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s">
           👥 Usuarios
         </button>
+        <!-- Privacidad Extrema toggle -->
         <div id="pe-toggle" onclick="togglePE()"
              title="Privacidad Extrema — cuando está activa, toda la información se envía a tu correo"
              style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);transition:all .2s;user-select:none">
@@ -547,8 +529,10 @@ select.finp option{background:var(--bg2)}
     </div>
     <div class="content" id="content">
 
+      <!-- ═══ TAB NUEVA ═══ -->
       <div id="tab-nueva">
 
+        <!-- MODO SELECTOR -->
         <div class="modo-selector">
           <button class="modo-btn active" id="mbtn-ci" onclick="setModo('ci')">
             <span class="modo-ico">÷</span>
@@ -565,6 +549,7 @@ select.finp option{background:var(--bg2)}
           </button>
         </div>
 
+        <!-- DATOS COMUNES -->
         <div class="form-section">
           <div class="fsec-lbl">Partes</div>
           <div class="form-grid">
@@ -637,6 +622,7 @@ select.finp option{background:var(--bg2)}
           </div>
         </div>
 
+        <!-- MODO: CUOTAS IGUALES -->
         <div class="form-section" id="sec-ci">
           <div class="fsec-lbl">Cuotas iguales — Parámetros</div>
           <div class="form-grid">
@@ -651,6 +637,7 @@ select.finp option{background:var(--bg2)}
           </div>
         </div>
 
+        <!-- MODO: CUOTA FIJA -->
         <div class="form-section" id="sec-cf" style="display:none">
           <div class="fsec-lbl">Cuota fija — Parámetros</div>
           <div class="form-grid">
@@ -665,6 +652,7 @@ select.finp option{background:var(--bg2)}
           </div>
         </div>
 
+        <!-- MODO: FINANCIERO -->
         <div class="form-section" id="sec-fin" style="display:none">
           <div class="fsec-lbl">Sistema financiero — Parámetros</div>
           <div class="form-grid">
@@ -698,6 +686,7 @@ select.finp option{background:var(--bg2)}
           </div>
         </div>
 
+        <!-- PREVIEW DE CÁLCULO -->
         <div class="preview-section" id="preview-section" style="display:none">
           <div class="preview-head">
             <span class="preview-title" id="preview-title">Cálculo</span>
@@ -712,12 +701,16 @@ select.finp option{background:var(--bg2)}
           <div class="preview-total" id="preview-total"></div>
         </div>
 
+        <!-- ACCIONES -->
         <div class="form-actions" style="max-width:860px">
           <button class="fab fab-ghost" onclick="previewLote()">👁 Vista previa</button>
           <button class="fab fab-green" id="btn-save" onclick="saveLote()" disabled>💾 Guardar operación</button>
         </div>
 
-      </div><div id="tab-browser" style="display:none">
+      </div><!-- /tab-nueva -->
+
+      <!-- ═══ TAB BROWSER ═══ -->
+      <div id="tab-browser" style="display:none">
         <div class="browser-toolbar">
           <div class="filter-btns">
             <button class="fbtn active" onclick="setFilter('TODOS',this)">Todos</button>
@@ -740,15 +733,18 @@ select.finp option{background:var(--bg2)}
         </div>
       </div>
 
+      <!-- ═══ TAB VISTA ═══ -->
       <div id="tab-vista" style="display:none">
         <div id="vista-content">
           <div class="vista-empty"><div class="ve-icon">🖨</div><div class="ve-title">Sin selección</div><div class="ve-sub">Abrí una operación desde "Mis operaciones" para ver e imprimir.</div></div>
         </div>
       </div>
 
-    </div></main>
+    </div><!-- /content -->
+  </main>
 </div>
 
+<!-- Modal registro -->
 <div class="overlay" id="register-overlay">
   <div class="modal">
     <div class="modal-icon">👤</div>
@@ -770,6 +766,7 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- ══ MODAL ABM USUARIOS ══ -->
 <div class="abm-overlay" id="abm-overlay">
   <div class="abm-modal">
     <div class="abm-head">
@@ -781,6 +778,7 @@ select.finp option{background:var(--bg2)}
     </div>
     <div class="abm-body">
 
+      <!-- Tabla de usuarios -->
       <div style="overflow-x:auto;border:1px solid var(--border);border-radius:9px;overflow:hidden">
         <table class="abm-tbl" id="abm-tbl">
           <thead>
@@ -795,6 +793,7 @@ select.finp option{background:var(--bg2)}
         </table>
       </div>
 
+      <!-- Formulario Alta/Edición -->
       <div class="abm-form" id="abm-form" style="display:none">
         <div class="abm-form-title" id="abm-form-title">✏ Editar usuario</div>
         <input type="hidden" id="abm-fila"/>
@@ -832,11 +831,13 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- Modal PRO upgrade -->
 <div class="overlay" id="pro-overlay">
   <div class="modal">
     <div class="modal-icon">⭐</div>
     <div class="modal-title">Función exclusiva PRO</div>
 
+    <!-- Paso 1: info -->
     <div id="pro-step-info">
       <div style="font-size:12px;color:var(--text2);margin-bottom:14px;text-align:center">
         <strong id="pro-feature-name" style="color:var(--blue)"></strong> está disponible en el plan PRO.
@@ -861,6 +862,7 @@ select.finp option{background:var(--bg2)}
       </div>
     </div>
 
+    <!-- Paso 2: confirmación -->
     <div id="pro-step-ok" style="display:none;text-align:center;padding:10px 0">
       <div style="font-size:36px;margin-bottom:12px">✅</div>
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">¡Solicitud enviada!</div>
@@ -875,6 +877,7 @@ select.finp option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- Modal -->
 <div class="overlay" id="modal-overlay">
   <div class="modal">
     <div class="modal-icon" id="modal-icon">📋</div>
@@ -891,6 +894,7 @@ select.finp option{background:var(--bg2)}
 </div>
 <div class="toast-container" id="toast-container"></div>
 
+<!-- Print areas -->
 <div id="print-area"></div>
 <div id="report-print-area"></div>
 
