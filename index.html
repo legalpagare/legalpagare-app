@@ -396,6 +396,7 @@ select.finp option{background:var(--bg2)}
   /* Cada hoja = 1 página A4 landscape */
   .print-sheet{
     width:100%;
+    height:200mm;
     display:flex;flex-direction:column;
     gap:2mm;
     page-break-after:always;break-after:page;
@@ -403,13 +404,15 @@ select.finp option{background:var(--bg2)}
   }
   .print-sheet:last-child{page-break-after:avoid;break-after:avoid}
   .sheet-wrap{padding:0!important;box-shadow:none!important;border-radius:0!important;width:100%!important}
-  /* Pagaré ocupa el ancho completo, altura natural */
-  .pagare-wrap{width:100%}
+  /* pagare-wrap crece para llenar el espacio disponible */
+  .pagare-wrap{width:100%;flex:1;display:flex;flex-direction:column}
+  /* pagare crece dentro del pagare-wrap, dejando espacio al sello */
   .pagare{
     width:100%;
-    flex-shrink:0;flex-grow:0;
+    flex:1;
     border:5px solid #1a5c1a!important;
     background:#f6fdf4!important;
+    overflow:hidden;
   }
   .pg-sello{display:flex!important}
   .pg-deco{background:#2e7d32!important;height:10px}
