@@ -1620,18 +1620,16 @@ function mkPagareHTML(p){
       <div class="pg-field"><span class="pg-lbl">Sellado</span><span class="pg-val">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
       <div class="pg-field" style="min-width:100px"><span class="pg-lbl">N°</span><span class="pg-val"><strong>${p.num}/${p.numFinal}</strong></span></div>
       <div class="pg-field" style="min-width:100px"><span class="pg-lbl">Vencimiento</span><span class="pg-val"><strong>${p.vtoFmt}</strong></span></div>
+      <div class="pg-field">
+        <span class="pg-lbl">Lugar y fecha</span>
+        <span class="pg-val" style="min-width:160px;font-size:9px">${esc(p.lugarEmision)}, ${p.diaEmision} de ${esc(p.mesEmisionNom)} de 20${String(p.anioEmision).slice(2)}</span>
+      </div>
       <div class="pg-porval">
         <span class="pg-por-lbl">POR ${esc(p.simbolo)}</span>
         <span class="pg-por-num">-- ${esc(p.montoFmt)} --</span>
       </div>
     </div>
-    <div class="pg-r2">
-      <span>LUGAR Y FECHA</span>
-      <span class="v">&nbsp;${esc(p.lugarEmision)}&nbsp;</span>,
-      <span class="v">&nbsp;${p.diaEmision}&nbsp;</span> de
-      <span class="v">&nbsp;${esc(p.mesEmisionNom)}&nbsp;</span>
-      de&nbsp;20${String(p.anioEmision).slice(2)}
-    </div>
+
     <div class="pg-r3">
       <span class="ci">El día</span>
       <span class="pg-dia-val">${esc(p.diaNombreVto)}</span>
@@ -2284,9 +2282,9 @@ function limpiarDeudor(){
   });
 }
 
-// ═══════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
 //  UI HELPERS
-// ═══════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
 function esc(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showErr(id,msg){ const e=document.getElementById(id); e.textContent=msg; e.classList.add('show'); }
 function hideErr(id){ document.getElementById(id).classList.remove('show'); }
