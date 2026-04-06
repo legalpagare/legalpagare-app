@@ -1610,8 +1610,6 @@ function mkPagareObj(s, i, total, lote){
     deudorLoc     : (()=>{ const p=(lote.deudor||'').split('|||'); return p[2]||''; })(),
     valRecibido  : lote.valRecibido||'',
     lugarPago    : lote.lugarPago||'',
-    tipoDoc      : lote.tipoDoc||'',
-    nroDoc       : lote.nroDoc||'',
     hash         : lote.hash||''
   };
 }
