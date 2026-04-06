@@ -1612,7 +1612,8 @@ function mkPagareObj(s, i, total, lote){
     deudorLoc     : (()=>{ const p=(lote.deudor||'').split('|||'); return p[2]||''; })(),
     valRecibido  : lote.valRecibido||'',
     lugarPago    : lote.lugarPago||'',
-    hash         : lote.hash||''
+    hash         : lote.hash||'',
+    ordenLote    : lote.orden||''
   };
 }
 
@@ -1624,6 +1625,7 @@ function mkPagareHTML(p){
     <div class="pg-r1">
       <div class="pg-field"><span class="pg-lbl">Sellado</span><span class="pg-val">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
       <div class="pg-field" style="min-width:100px"><span class="pg-lbl">N°</span><span class="pg-val"><strong>${p.num}/${p.numFinal}</strong></span></div>
+      ${p.ordenLote?'<div class="pg-field"><span class="pg-lbl">Orden</span><span class="pg-val" style="font-size:8px;color:#666">'+esc(p.ordenLote)+'</span></div>':''}
       <div class="pg-field" style="min-width:100px"><span class="pg-lbl">Vencimiento</span><span class="pg-val"><strong>${p.vtoFmt}</strong></span></div>
       <div class="pg-field">
         <span class="pg-lbl">Lugar y fecha</span>
