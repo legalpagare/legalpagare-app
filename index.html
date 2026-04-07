@@ -1059,7 +1059,7 @@ function renderUser(){
   if (u.esAdmin) { b.textContent='ADMIN'; b.className='uc-badge admin'; }
   else if (IS_PRO) { b.textContent='PRO'; b.className='uc-badge pro'; }
   else { b.textContent='STD'; b.className='uc-badge user'; }
-  if (u.esAdmin) document.getElementById('th-email').style.display='table-cell';
+  document.getElementById('th-email').style.display = u.esAdmin ? 'table-cell' : 'none';
   updateCupo(u.cupo, u.cupoUsado);
   checkVencimiento(u);
 }
