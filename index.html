@@ -1040,6 +1040,7 @@ async function verifyCode(){
 }
 function logout(){
   SESSION=null; localStorage.removeItem('pg_sess');
+  ALL_LOTES=[]; CURR_LOTE=null; CURR_SERIE=[]; FILTER='TODOS';
   showLogin();
   document.getElementById('ls1').style.display='block'; document.getElementById('ls2').style.display='none';
   document.getElementById('inp-email').value=''; clearOTP();
