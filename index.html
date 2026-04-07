@@ -927,12 +927,36 @@ let IS_PRO     = false;       // Plan PRO
 document.addEventListener('DOMContentLoaded', () => {
   initOTP();
   setDefaultDates();
+  initSession();
+});
+
+async function initSession() {
   const saved = localStorage.getItem('pg_sess');
   if (saved) {
-    try { const o = JSON.parse(saved); if (o.token && o.user) { SESSION = o; showApp(); return; } } catch {}
+    try {
+      const o = JSON.parse(saved);
+      if (o.token && o.user) {
+        SESSION = o;
+        showLoading('Verificando sesión...');
+        const check = await api({action:'getUser', token:o.token});
+        hideLoading();
+        if (check.ok) {
+          SESSION.user = check.user;
+          localStorage.setItem('pg_sess', JSON.stringify(SESSION));
+          showApp();
+          return;
+        }
+        // Token expirado o inválido
+        SESSION = null;
+        localStorage.removeItem('pg_sess');
+        toast('Sesión expirada. Ingresá de nuevo.','inf');
+      }
+    } catch(e) {
+      localStorage.removeItem('pg_sess');
+    }
   }
   showLogin();
-});
+}
 
 function setDefaultDates() {
   const today = new Date().toISOString().slice(0,10);
