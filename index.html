@@ -597,7 +597,7 @@ select.finp option{background:var(--bg2)}
           <div class="form-grid cols4">
             <div class="fg">
               <label class="flbl">Moneda <span class="req">*</span></label>
-              <select class="finp" id="f-moneda" onchange="recalcular()">
+              <select class="finp" id="f-moneda" onchange="recalcularDebounced()">
                 <option value="USD">U$D – Dólares</option>
                 <option value="ARS">$ – Pesos</option>
               </select>
@@ -608,7 +608,7 @@ select.finp option{background:var(--bg2)}
             </div>
             <div class="fg">
               <label class="flbl">1° Vencimiento <span class="req">*</span></label>
-              <input class="finp" id="f-vtoIni" type="date" oninput="recalcular()"/>
+              <input class="finp" id="f-vtoIni" type="date" oninput="recalcularDebounced()"/>
             </div>
             <div class="fg">
               <label class="flbl">Lugar de emisión</label>
@@ -631,11 +631,11 @@ select.finp option{background:var(--bg2)}
           <div class="form-grid">
             <div class="fg">
               <label class="flbl">Monto total <span class="req">*</span></label>
-              <input class="finp" id="ci-monto" type="number" min="0" step="0.01" placeholder="100000" oninput="recalcular()"/>
+              <input class="finp" id="ci-monto" type="number" min="0" step="0.01" placeholder="100000" oninput="recalcularDebounced()"/>
             </div>
             <div class="fg">
               <label class="flbl">Cantidad de cuotas <span class="req">*</span></label>
-              <input class="finp" id="ci-cuotas" type="number" min="1" step="1" placeholder="30" oninput="recalcular()"/>
+              <input class="finp" id="ci-cuotas" type="number" min="1" step="1" placeholder="30" oninput="recalcularDebounced()"/>
             </div>
           </div>
         </div>
@@ -646,11 +646,11 @@ select.finp option{background:var(--bg2)}
           <div class="form-grid">
             <div class="fg">
               <label class="flbl">Monto total <span class="req">*</span></label>
-              <input class="finp" id="cf-monto" type="number" min="0" step="0.01" placeholder="98600" oninput="recalcular()"/>
+              <input class="finp" id="cf-monto" type="number" min="0" step="0.01" placeholder="98600" oninput="recalcularDebounced()"/>
             </div>
             <div class="fg">
               <label class="flbl">Cuota mensual <span class="req">*</span></label>
-              <input class="finp" id="cf-cuota" type="number" min="0" step="0.01" placeholder="1000" oninput="recalcular()"/>
+              <input class="finp" id="cf-cuota" type="number" min="0" step="0.01" placeholder="1000" oninput="recalcularDebounced()"/>
             </div>
           </div>
         </div>
@@ -669,11 +669,11 @@ select.finp option{background:var(--bg2)}
             </div>
             <div class="fg">
               <label class="flbl">Capital a financiar <span class="req">*</span></label>
-              <input class="finp" id="fin-capital" type="number" min="0" step="0.01" placeholder="50000" oninput="recalcular()"/>
+              <input class="finp" id="fin-capital" type="number" min="0" step="0.01" placeholder="50000" oninput="recalcularDebounced()"/>
             </div>
             <div class="fg">
               <label class="flbl">Plazo (meses) <span class="req">*</span></label>
-              <input class="finp" id="fin-plazo" type="number" min="1" step="1" placeholder="24" oninput="recalcular()"/>
+              <input class="finp" id="fin-plazo" type="number" min="1" step="1" placeholder="24" oninput="recalcularDebounced()"/>
             </div>
             <div class="fg span2" style="grid-column:1/-1">
               <label class="flbl">Tasa de interés <span class="req">*</span></label>
@@ -682,7 +682,7 @@ select.finp option{background:var(--bg2)}
                   <button class="tt-btn active" id="tt-tna" onclick="setTipoTasa('TNA')">TNA</button>
                   <button class="tt-btn" id="tt-men" onclick="setTipoTasa('MENSUAL')">Mensual</button>
                 </div>
-                <input class="finp" id="fin-tasa" type="number" min="0" step="0.01" placeholder="72" oninput="recalcular()" style="max-width:120px"/>
+                <input class="finp" id="fin-tasa" type="number" min="0" step="0.01" placeholder="72" oninput="recalcularDebounced()" style="max-width:120px"/>
                 <span style="font-size:11px;color:var(--text3)">% &nbsp;→&nbsp; <span id="tasa-equiv" style="color:var(--gold);font-family:var(--mono)"></span></span>
               </div>
             </div>
@@ -2031,6 +2031,8 @@ function toast(msg,type='inf'){
 // ════════════════════════════════════════════════════════
 //  MATH HELPERS
 // ════════════════════════════════════════════════════════
+let _recalcTimer=null;
+function recalcularDebounced(){ clearTimeout(_recalcTimer); _recalcTimer=setTimeout(recalcular,180); }
 function roundD(n, dec){ const f=Math.pow(10,dec); return Math.round(n*f)/f; }
 
 function parseISODate(s){
