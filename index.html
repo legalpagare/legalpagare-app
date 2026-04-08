@@ -2499,6 +2499,13 @@ function seleccionarTemplate(templateId, orden) {
   document.getElementById('tpl-overlay').classList.remove('show');
   generarDesdeTemplate(templateId, orden);
 }
+async function generarDesdeTemplate(templateId, orden) {
+  showLoading('Generando documento...');
+  const r = await api({ action:'generarDocumento', token:SESSION.token, templateId, orden });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast('✓ ' + r.mensaje, 'ok');
+}
 
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
