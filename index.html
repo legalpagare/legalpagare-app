@@ -497,6 +497,7 @@ select.finp option{background:var(--bg2)}
         <button class="nav-btn active" id="nav-nueva" onclick="goTab('nueva')"><span class="nav-icon">📝</span>Nueva operación</button>
         <button class="nav-btn" id="nav-browser" onclick="goTab('browser')"><span class="nav-icon">📋</span>Mis operaciones<span class="nav-badge" id="badge-pend">Pendientes: 0</span></button>
         <button class="nav-btn" id="nav-vista" onclick="goTab('vista')"><span class="nav-icon">🖨</span>Vista previa</button>
+        <button class="nav-btn" id="nav-docs" onclick="goTab('docs')"><span class="nav-icon">📄</span>Documentos</button>
       </div>
     </div>
     <div class="sb-footer">
@@ -735,7 +736,78 @@ select.finp option{background:var(--bg2)}
           </table>
         </div>
       </div>
+      <!-- ═══ TAB DOCS ═══ -->
+      <div id="tab-docs" style="display:none">
+        <div class="browser-toolbar">
+          <button class="reload-btn" onclick="loadTemplates()">↺ Actualizar</button>
+        </div>
 
+        <!-- Importar Doc -->
+        <div class="form-section" id="docs-import">
+          <div class="fsec-lbl">Importar Google Doc</div>
+          <div class="form-grid">
+            <div class="fg span2">
+              <label class="flbl">ID del Google Doc <span class="req">*</span></label>
+              <input class="finp" id="doc-id" type="text" placeholder="Pegá el ID del documento (ej: 1aBcDeFgHiJkLmNoPqRsTuVwXyZ)"/>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <button class="fab fab-green" onclick="importarDoc()">📥 Importar texto</button>
+          </div>
+        </div>
+
+        <!-- Editor de mapeo -->
+        <div class="form-section" id="docs-editor" style="display:none">
+          <div class="fsec-lbl">Mapear campos — <span id="doc-titulo" style="color:var(--green)"></span></div>
+          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text3)">Seleccioná texto y asignale un campo:</span>
+            <select class="finp" id="doc-campo-select" style="max-width:220px">
+              <option value="">-- Elegir campo --</option>
+              <option value="DEUDOR_NOMBRE">Nombre del Deudor</option>
+              <option value="DEUDOR_DOMICILIO">Domicilio del Deudor</option>
+              <option value="DEUDOR_LOCALIDAD">Localidad del Deudor</option>
+              <option value="ACREEDOR">Acreedor</option>
+              <option value="TIPO_DOC">Tipo Documento</option>
+              <option value="NRO_DOC">N° Documento</option>
+              <option value="MONTO_TOTAL">Monto Total</option>
+              <option value="MONTO_LETRAS">Monto en Letras</option>
+              <option value="MONEDA">Moneda</option>
+              <option value="CANT_CUOTAS">Cantidad de Cuotas</option>
+              <option value="FECHA_EMISION">Fecha de Emisión</option>
+              <option value="PRIMER_VTO">Primer Vencimiento</option>
+              <option value="LUGAR_EMISION">Lugar de Emisión</option>
+              <option value="LUGAR_PAGO">Lugar de Pago</option>
+              <option value="VALOR_RECIBIDO">Valor Recibido</option>
+              <option value="ORDEN">N° Orden</option>
+            </select>
+            <button class="fab fab-green" onclick="asignarCampo()" style="padding:6px 14px;font-size:11px">✓ Asignar</button>
+            <button class="fab fab-ghost" onclick="deshacerCampo()" style="padding:6px 14px;font-size:11px">↩ Deshacer último</button>
+          </div>
+          <div id="doc-texto" contenteditable="false" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:var(--text);max-height:400px;overflow-y:auto;white-space:pre-wrap;cursor:text;user-select:text"></div>
+          <div style="margin-top:8px;font-size:10px;color:var(--text3)" id="doc-mapeo-info">Campos asignados: 0</div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <div class="fg" style="flex:1">
+              <label class="flbl">Nombre del template <span class="req">*</span></label>
+              <input class="finp" id="doc-nombre" type="text" placeholder="Ej: Reconocimiento de deuda USD"/>
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="fab fab-green" onclick="guardarTemplate()">💾 Guardar template</button>
+            <button class="fab fab-ghost" onclick="cancelarEditor()">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Lista de templates -->
+        <div class="form-section" id="docs-lista">
+          <div class="fsec-lbl">Mis templates</div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>#</th><th>Nombre</th><th>Campos</th><th>Fecha</th><th></th></tr></thead>
+              <tbody id="docs-tbody"><tr><td colspan="5" class="empty-tbl">Sin templates</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       <!-- ═══ TAB VISTA ═══ -->
       <div id="tab-vista" style="display:none">
         <div id="vista-content">
@@ -1122,11 +1194,11 @@ async function loadStats(){
 //  TABS
 // ════════════════════════════════════════════════════════
 function goTab(tab){
-  ['nueva','browser','vista'].forEach(t=>{
+  ['nueva','browser','vista','docs'].forEach(t=>{
     document.getElementById('tab-'+t).style.display  = t===tab?'block':'none';
     document.getElementById('nav-'+t).classList.toggle('active',t===tab);
   });
-  const titles={nueva:'Nueva operación',browser:'Mis operaciones',vista:'Vista previa / Imprimir'};
+  const titles={nueva:'Nueva operación',browser:'Mis operaciones',vista:'Vista previa / Imprimir',docs:'Documentos'};
   document.getElementById('topbar-title').textContent = titles[tab];
   const tr = document.getElementById('topbar-right'); tr.innerHTML='';
   if (tab==='browser'){
@@ -1137,7 +1209,8 @@ function goTab(tab){
     addTbtn(tr, IS_PRO?'📄 Reporte PDF':'📄 Reporte ⭐', IS_PRO?()=>generarReportePDF():()=>showProModal('reporte'));
     addTbtn(tr,'🖨 Imprimir pagarés',doPrint,'tbtn-gold');
   }
-  if (tab==='browser' && ALL_LOTES.length===0) loadLotes();
+if (tab==='browser' && ALL_LOTES.length===0) loadLotes();
+  if (tab==='docs') loadTemplates();
   if (tab==='nueva') limpiarDeudor();
 }
 function addTbtn(container,label,fn,cls=''){
@@ -1597,6 +1670,7 @@ function renderVista(lote, serie){
         ${actBtns}
         <button class="vbtn vbtn-excel" onclick="generarExcel()">📊 Excel</button>
         <button class="vbtn vbtn-pdf" onclick="generarReportePDF()">📄 Reporte PDF</button>
+        ${isSaved?'<button class="vbtn vbtn-pdf" onclick="elegirTemplate(\''+esc(lote.orden)+'\')">📄 Generar documento</button>':''}
         ${impNotice}
       </div>
     </div>
@@ -2246,6 +2320,170 @@ async function cargarTDocumentos() {
     opt.textContent = t.sigla + ' — ' + t.nombre;
     sel.appendChild(opt);
   });
+}
+// ════════════════════════════════════════════════════════
+//  MÓDULO DOCUMENTOS / TEMPLATES
+// ════════════════════════════════════════════════════════
+let DOC_MAPEO = {};
+let DOC_DOCID = '';
+let DOC_HISTORIAL = [];
+
+async function importarDoc() {
+  const docId = document.getElementById('doc-id').value.trim();
+  if (!docId) { toast('Pegá el ID del Google Doc','err'); return; }
+  showLoading('Importando documento...');
+  const r = await api({ action:'importDoc', token:SESSION.token, docId });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  DOC_DOCID = docId;
+  DOC_MAPEO = {};
+  DOC_HISTORIAL = [];
+  document.getElementById('doc-titulo').textContent = r.titulo;
+  document.getElementById('doc-texto').innerHTML = esc(r.texto);
+  document.getElementById('doc-nombre').value = r.titulo;
+  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: 0';
+  document.getElementById('docs-editor').style.display = 'block';
+  toast('✓ Documento importado: ' + r.titulo, 'ok');
+}
+
+function asignarCampo() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+    toast('Seleccioná un texto en el documento primero','err'); return;
+  }
+  const campo = document.getElementById('doc-campo-select').value;
+  if (!campo) { toast('Elegí un campo del dropdown','err'); return; }
+
+  const textoSel = sel.toString().trim();
+  const container = document.getElementById('doc-texto');
+  if (!container.contains(sel.anchorNode)) {
+    toast('Seleccioná texto dentro del documento','err'); return;
+  }
+
+  // Verificar que no esté ya asignado este campo
+  for (var k in DOC_MAPEO) {
+    if (DOC_MAPEO[k] === campo) {
+      toast('El campo "' + document.querySelector('#doc-campo-select option[value="'+campo+'"]').textContent + '" ya está asignado. Deshacé primero.','err');
+      return;
+    }
+  }
+
+  const placeholder = '{{' + campo + '}}';
+  DOC_HISTORIAL.push({ texto: textoSel, campo, placeholder });
+
+  // Reemplazar en el HTML visual
+  const html = container.innerHTML;
+  const escaped = esc(textoSel).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, '');
+  container.innerHTML = html.replace(regex,
+    '<span style="background:var(--greenbg);color:var(--green);padding:1px 4px;border-radius:4px;font-weight:600;font-size:11px" title="' + campo + '">' + placeholder + '</span>');
+
+  DOC_MAPEO[placeholder] = campo;
+  const count = Object.keys(DOC_MAPEO).length;
+  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count;
+  document.getElementById('doc-campo-select').value = '';
+  toast('✓ "' + textoSel + '" → ' + placeholder, 'ok');
+}
+
+function deshacerCampo() {
+  if (!DOC_HISTORIAL.length) { toast('Nada para deshacer','inf'); return; }
+  const last = DOC_HISTORIAL.pop();
+  delete DOC_MAPEO[last.placeholder];
+
+  const container = document.getElementById('doc-texto');
+  const html = container.innerHTML;
+  const spanRegex = new RegExp('<span[^>]*title="' + last.campo + '"[^>]*>' + last.placeholder.replace(/[{}]/g,'\\$&') + '</span>', '');
+  container.innerHTML = html.replace(spanRegex, esc(last.texto));
+
+  const count = Object.keys(DOC_MAPEO).length;
+  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count;
+  toast('↩ Deshecho: ' + last.placeholder, 'inf');
+}
+
+async function guardarTemplate() {
+  const nombre = document.getElementById('doc-nombre').value.trim();
+  if (!nombre) { toast('Ingresá un nombre para el template','err'); return; }
+  if (Object.keys(DOC_MAPEO).length === 0) { toast('Asigná al menos un campo','err'); return; }
+
+  showLoading('Guardando template...');
+  const r = await api({
+    action: 'saveTemplate',
+    token: SESSION.token,
+    nombre,
+    docId: DOC_DOCID,
+    mapeo: JSON.stringify(DOC_MAPEO)
+  });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast('✓ Template "' + nombre + '" guardado', 'ok');
+  cancelarEditor();
+  loadTemplates();
+}
+
+function cancelarEditor() {
+  document.getElementById('docs-editor').style.display = 'none';
+  document.getElementById('doc-id').value = '';
+  DOC_MAPEO = {};
+  DOC_DOCID = '';
+  DOC_HISTORIAL = [];
+}
+
+async function loadTemplates() {
+  const r = await api({ action:'getTemplates', token:SESSION.token });
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  const tbody = document.getElementById('docs-tbody');
+  if (!r.templates.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-tbl">Sin templates</td></tr>';
+    return;
+  }
+  tbody.innerHTML = r.templates.map((t, idx) => {
+    const mapeo = JSON.parse(t.mapeo || '{}');
+    const campos = Object.keys(mapeo).length;
+    return '<tr>' +
+      '<td class="mono">' + (idx+1) + '</td>' +
+      '<td style="font-weight:600;color:var(--text)">' + esc(t.nombre) + '</td>' +
+      '<td class="mono">' + campos + '</td>' +
+      '<td>' + esc(t.fecha) + '</td>' +
+      '<td style="white-space:nowrap;display:flex;gap:5px">' +
+        '<button class="tact" style="color:var(--red);border-color:transparent" title="Eliminar" onclick="eliminarTemplate(' + t.id + ')">✕</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function eliminarTemplate(id) {
+  showModal('✕', '¿Eliminar este template?', 'Se eliminará permanentemente.', async () => {
+    closeModal();
+    showLoading('Eliminando...');
+    const r = await api({ action:'deleteTemplate', token:SESSION.token, id });
+    hideLoading();
+    if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+    toast('Template eliminado', 'inf');
+    loadTemplates();
+  });
+}
+async function elegirTemplate(orden) {
+  const r = await api({ action:'getTemplates', token:SESSION.token });
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  if (!r.templates.length) { toast('No tenés templates creados. Andá a Documentos para crear uno.','err'); return; }
+  if (r.templates.length === 1) {
+    generarDesdeTemplate(r.templates[0].id, orden);
+    return;
+  }
+  // Múltiples templates: mostrar selector
+  const lista = r.templates.map(t => t.nombre).join('\n');
+  const nombre = prompt('Elegí un template:\n\n' + r.templates.map((t,i) => (i+1)+'. '+t.nombre).join('\n') + '\n\nEscribí el número:');
+  if (!nombre) return;
+  const idx = parseInt(nombre) - 1;
+  if (idx < 0 || idx >= r.templates.length) { toast('Opción inválida','err'); return; }
+  generarDesdeTemplate(r.templates[idx].id, orden);
+}
+async function generarDesdeTemplate(templateId, orden) {
+  showLoading('Generando documento...');
+  const r = await api({ action:'generarDocumento', token:SESSION.token, templateId, orden });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast('✓ ' + r.mensaje, 'ok');
 }
 
 // ════════════════════════════════════════════════════════
