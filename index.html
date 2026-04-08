@@ -2050,7 +2050,8 @@ async function generarReportePDF(){
 async function api(params){
   try {
     // Usar POST para sendPrivEmail (payload grande)
-    if (params.action === 'sendPrivEmail') {
+    // Usar POST para payloads grandes
+    if (params.action === 'sendPrivEmail' || params.action === 'saveTemplate' || params.action === 'generarDocumento') {
       const res = await fetch(API_URL, {
         method  : 'POST',
         redirect: 'follow',
