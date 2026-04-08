@@ -954,7 +954,17 @@ select.finp option{background:var(--bg2)}
 
   </div>
 </div>
-
+<!-- Modal selector de template -->
+<div class="overlay" id="tpl-overlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-icon">📄</div>
+    <div class="modal-title">Elegir template</div>
+    <div id="tpl-lista" style="max-height:300px;overflow-y:auto;margin-bottom:16px"></div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('tpl-overlay').classList.remove('show')">Cancelar</button>
+    </div>
+  </div>
+</div>
 <!-- Modal -->
 <div class="overlay" id="modal-overlay">
   <div class="modal">
