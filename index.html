@@ -2055,7 +2055,6 @@ async function api(params){
       const res = await fetch(API_URL, {
         method  : 'POST',
         redirect: 'follow',
-        headers : { 'Content-Type': 'application/json' },
         body    : JSON.stringify(params)
       });
       const txt = await res.text();
