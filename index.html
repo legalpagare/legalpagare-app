@@ -2391,7 +2391,7 @@ function asignarCampo() {
   container.innerHTML = html.replace(regex,
     '<span style="background:var(--greenbg);color:var(--green);padding:1px 4px;border-radius:4px;font-weight:600;font-size:11px" title="' + campo + '">' + placeholder + '</span>');
 
-  DOC_MAPEO[placeholder] = campo;
+  DOC_MAPEO[textoSel] = campo;
   const count = Object.keys(DOC_MAPEO).length;
   document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count;
   document.getElementById('doc-campo-select').value = '';
@@ -2401,7 +2401,7 @@ function asignarCampo() {
 function deshacerCampo() {
   if (!DOC_HISTORIAL.length) { toast('Nada para deshacer','inf'); return; }
   const last = DOC_HISTORIAL.pop();
-  delete DOC_MAPEO[last.placeholder];
+  delete DOC_MAPEO[last.texto];
 
   const container = document.getElementById('doc-texto');
   const html = container.innerHTML;
