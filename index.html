@@ -2314,7 +2314,7 @@ async function confirmarRegistro() {
 // ════════════════════════════════════════════════════════
 function capitalizarInput(inp){
   const pos = inp.selectionStart;
-  inp.value = inp.value.replace(/\b\w/g, c => c.toUpperCase());
+  inp.value = inp.value.replace(/(^|\s)\S/g, c => c.toUpperCase());
   inp.setSelectionRange(pos, pos);
 }
 function limpiarDeudor(){
