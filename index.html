@@ -2483,20 +2483,21 @@ async function elegirTemplate(orden) {
     generarDesdeTemplate(r.templates[0].id, orden);
     return;
   }
-  // Múltiples templates: mostrar selector
-  const lista = r.templates.map(t => t.nombre).join('\n');
-  const nombre = prompt('Elegí un template:\n\n' + r.templates.map((t,i) => (i+1)+'. '+t.nombre).join('\n') + '\n\nEscribí el número:');
-  if (!nombre) return;
-  const idx = parseInt(nombre) - 1;
-  if (idx < 0 || idx >= r.templates.length) { toast('Opción inválida','err'); return; }
-  generarDesdeTemplate(r.templates[idx].id, orden);
+  const lista = document.getElementById('tpl-lista');
+  lista.innerHTML = r.templates.map(t => {
+    const mapeo = JSON.parse(t.mapeo || '{}');
+    const campos = Object.keys(mapeo).length;
+    return '<button onclick="seleccionarTemplate('+t.id+',\''+esc(orden)+'\')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 14px;margin-bottom:4px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;text-align:left" onmouseover="this.style.borderColor=\'var(--greend)\';this.style.color=\'var(--green)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text)\'">' +
+      '<span style="font-weight:600">'+esc(t.nombre)+'</span>' +
+      '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+campos+' campos · '+esc(t.fecha)+'</span>' +
+    '</button>';
+  }).join('');
+  document.getElementById('tpl-overlay').classList.add('show');
 }
-async function generarDesdeTemplate(templateId, orden) {
-  showLoading('Generando documento...');
-  const r = await api({ action:'generarDocumento', token:SESSION.token, templateId, orden });
-  hideLoading();
-  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  toast('✓ ' + r.mensaje, 'ok');
+
+function seleccionarTemplate(templateId, orden) {
+  document.getElementById('tpl-overlay').classList.remove('show');
+  generarDesdeTemplate(templateId, orden);
 }
 
 // ════════════════════════════════════════════════════════
