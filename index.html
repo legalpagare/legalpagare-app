@@ -762,31 +762,11 @@ select.finp option{background:var(--bg2)}
         <!-- Editor de mapeo -->
         <div class="form-section" id="docs-editor" style="display:none">
           <div class="fsec-lbl">Mapear campos — <span id="doc-titulo" style="color:var(--green)"></span></div>
-          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3)">Seleccioná texto y asignale un campo:</span>
-            <select class="finp" id="doc-campo-select" style="max-width:220px">
-              <option value="">-- Elegir campo --</option>
-              <option value="DEUDOR_NOMBRE">Nombre del Deudor</option>
-              <option value="DEUDOR_DOMICILIO">Domicilio del Deudor</option>
-              <option value="DEUDOR_LOCALIDAD">Localidad del Deudor</option>
-              <option value="ACREEDOR">Acreedor</option>
-              <option value="TIPO_DOC">Tipo Documento</option>
-              <option value="NRO_DOC">N° Documento</option>
-              <option value="MONTO_TOTAL">Monto Total</option>
-              <option value="MONTO_LETRAS">Monto en Letras</option>
-              <option value="MONEDA">Moneda</option>
-              <option value="CANT_CUOTAS">Cantidad de Cuotas</option>
-              <option value="FECHA_EMISION">Fecha de Emisión</option>
-              <option value="PRIMER_VTO">Primer Vencimiento</option>
-              <option value="LUGAR_EMISION">Lugar de Emisión</option>
-              <option value="LUGAR_PAGO">Lugar de Pago</option>
-              <option value="VALOR_RECIBIDO">Valor Recibido</option>
-              <option value="ORDEN">N° Orden</option>
-            </select>
-            <button class="fab fab-green" onclick="asignarCampo()" style="padding:6px 14px;font-size:11px">✓ Asignar</button>
-            <button class="fab fab-ghost" onclick="deshacerCampo()" style="padding:6px 14px;font-size:11px">↩ Deshacer último</button>
+          <div style="margin-bottom:12px;background:var(--bluebg);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:10px 14px;font-size:11px;color:var(--blue);line-height:1.6">
+            📌 Se encontraron <strong id="doc-lp-count">0</strong> marcadores <strong>*LP*</strong> en el documento. Asigná un campo a cada uno.
           </div>
-          <div id="doc-texto" contenteditable="false" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:var(--text);max-height:400px;overflow-y:auto;white-space:pre-wrap;cursor:text;user-select:text"></div>
+          <div id="doc-texto" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:var(--text);max-height:300px;overflow-y:auto;white-space:pre-wrap;margin-bottom:14px"></div>
+          <div id="doc-mapeo-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
           <div style="margin-top:8px;font-size:10px;color:var(--text3)" id="doc-mapeo-info">Campos asignados: 0</div>
           <div style="margin-top:12px;display:flex;gap:8px">
             <div class="fg" style="flex:1">
@@ -799,7 +779,6 @@ select.finp option{background:var(--bg2)}
             <button class="fab fab-ghost" onclick="cancelarEditor()">Cancelar</button>
           </div>
         </div>
-
         <!-- Lista de templates -->
         <div class="form-section" id="docs-lista">
           <div class="fsec-lbl">Mis templates</div>
@@ -2339,7 +2318,7 @@ async function cargarTDocumentos() {
 // ════════════════════════════════════════════════════════
 let DOC_MAPEO = {};
 let DOC_DOCID = '';
-let DOC_HISTORIAL = [];
+let DOC_LP_POSITIONS = [];
 
 async function importarDoc() {
   const docId = document.getElementById('doc-id').value.trim();
@@ -2350,85 +2329,108 @@ async function importarDoc() {
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
   DOC_DOCID = docId;
   DOC_MAPEO = {};
-  DOC_HISTORIAL = [];
+  DOC_LP_POSITIONS = [];
+
+  // Buscar marcadores *LP* en el texto
+  const texto = r.texto;
+  const marker = '*LP*';
+  let idx = 0;
+  let pos = 0;
+  while ((pos = texto.indexOf(marker, pos)) !== -1) {
+    var ctxStart = Math.max(0, pos - 30);
+    var ctxEnd   = Math.min(texto.length, pos + marker.length + 30);
+    var before   = texto.substring(ctxStart, pos).replace(/\n/g,' ');
+    var after    = texto.substring(pos + marker.length, ctxEnd).replace(/\n/g,' ');
+    DOC_LP_POSITIONS.push({ index: idx, pos: pos, before: before, after: after });
+    idx++;
+    pos += marker.length;
+  }
+
+  if (DOC_LP_POSITIONS.length === 0) {
+    toast('No se encontraron marcadores *LP* en el documento. Agregá *LP* donde van los datos variables.','err');
+    return;
+  }
+
   document.getElementById('doc-titulo').textContent = r.titulo;
-  document.getElementById('doc-texto').innerHTML = esc(r.texto);
   document.getElementById('doc-nombre').value = r.titulo;
-  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: 0';
+  document.getElementById('doc-lp-count').textContent = DOC_LP_POSITIONS.length;
+
+  // Mostrar texto con marcadores resaltados
+  var htmlTexto = esc(texto).replace(/\*LP\*/g,
+    '<span style="background:var(--amberbg);color:var(--amber);padding:1px 6px;border-radius:4px;font-weight:700;font-size:11px">*LP*</span>');
+  document.getElementById('doc-texto').innerHTML = htmlTexto;
+
+  // Generar lista de asignación
+  var selectOpts =
+    '<option value="">-- Elegir campo --</option>' +
+    '<option value="DEUDOR_NOMBRE">Nombre del Deudor</option>' +
+    '<option value="DEUDOR_DOMICILIO">Domicilio del Deudor</option>' +
+    '<option value="DEUDOR_LOCALIDAD">Localidad del Deudor</option>' +
+    '<option value="ACREEDOR">Acreedor</option>' +
+    '<option value="TIPO_DOC">Tipo Documento</option>' +
+    '<option value="NRO_DOC">N° Documento</option>' +
+    '<option value="MONTO_TOTAL">Monto Total</option>' +
+    '<option value="MONTO_LETRAS">Monto en Letras</option>' +
+    '<option value="MONEDA">Moneda</option>' +
+    '<option value="CANT_CUOTAS">Cantidad de Cuotas</option>' +
+    '<option value="FECHA_EMISION">Fecha de Emisión</option>' +
+    '<option value="PRIMER_VTO">Primer Vencimiento</option>' +
+    '<option value="LUGAR_EMISION">Lugar de Emisión</option>' +
+    '<option value="LUGAR_PAGO">Lugar de Pago</option>' +
+    '<option value="VALOR_RECIBIDO">Valor Recibido</option>' +
+    '<option value="ORDEN">N° Orden</option>';
+
+  var listaHtml = DOC_LP_POSITIONS.map(function(lp) {
+    return '<div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">' +
+      '<span style="font-family:var(--mono);font-size:11px;color:var(--amber);font-weight:700;white-space:nowrap">*LP* #' + (lp.index+1) + '</span>' +
+      '<span style="font-size:11px;color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="...'+esc(lp.before)+' *LP* '+esc(lp.after)+'...">...' + esc(lp.before) + ' <strong style="color:var(--amber)">*LP*</strong> ' + esc(lp.after) + '...</span>' +
+      '<select class="finp doc-lp-select" data-index="' + lp.index + '" style="max-width:200px;flex-shrink:0" onchange="actualizarMapeoInfo()">' + selectOpts + '</select>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('doc-mapeo-lista').innerHTML = listaHtml;
+  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: 0 / ' + DOC_LP_POSITIONS.length;
   document.getElementById('docs-editor').style.display = 'block';
-  toast('✓ Documento importado: ' + r.titulo, 'ok');
+  toast('✓ Documento importado: ' + r.titulo + ' — ' + DOC_LP_POSITIONS.length + ' marcadores encontrados', 'ok');
 }
 
-function asignarCampo() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-    toast('Seleccioná un texto en el documento primero','err'); return;
-  }
-  const campo = document.getElementById('doc-campo-select').value;
-  if (!campo) { toast('Elegí un campo del dropdown','err'); return; }
-
-  const textoSel = sel.toString().trim();
-  const container = document.getElementById('doc-texto');
-  if (!container.contains(sel.anchorNode)) {
-    toast('Seleccioná texto dentro del documento','err'); return;
-  }
-
-  // Verificar que no esté ya asignado este campo
-  for (var k in DOC_MAPEO) {
-    if (DOC_MAPEO[k] === campo) {
-      toast('El campo "' + document.querySelector('#doc-campo-select option[value="'+campo+'"]').textContent + '" ya está asignado. Deshacé primero.','err');
-      return;
-    }
-  }
-
-  const placeholder = '{{' + campo + '}}';
-  DOC_HISTORIAL.push({ texto: textoSel, campo, placeholder });
-
-  // Reemplazar en el HTML visual
-  const html = container.innerHTML;
-  const escaped = esc(textoSel).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(escaped, '');
-  container.innerHTML = html.replace(regex,
-    '<span style="background:var(--greenbg);color:var(--green);padding:1px 4px;border-radius:4px;font-weight:600;font-size:11px" title="' + campo + '">' + placeholder + '</span>');
-
-  DOC_MAPEO[textoSel] = campo;
-  const count = Object.keys(DOC_MAPEO).length;
-  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count;
-  document.getElementById('doc-campo-select').value = '';
-  toast('✓ "' + textoSel + '" → ' + placeholder, 'ok');
-}
-
-function deshacerCampo() {
-  if (!DOC_HISTORIAL.length) { toast('Nada para deshacer','inf'); return; }
-  const last = DOC_HISTORIAL.pop();
-  delete DOC_MAPEO[last.texto];
-
-  const container = document.getElementById('doc-texto');
-  const html = container.innerHTML;
-  const spanRegex = new RegExp('<span[^>]*title="' + last.campo + '"[^>]*>' + last.placeholder.replace(/[{}]/g,'\\$&') + '</span>', '');
-  container.innerHTML = html.replace(spanRegex, esc(last.texto));
-
-  const count = Object.keys(DOC_MAPEO).length;
-  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count;
-  toast('↩ Deshecho: ' + last.placeholder, 'inf');
+function actualizarMapeoInfo() {
+  var selects = document.querySelectorAll('.doc-lp-select');
+  var count = 0;
+  selects.forEach(function(s) { if (s.value) count++; });
+  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count + ' / ' + DOC_LP_POSITIONS.length;
 }
 
 async function guardarTemplate() {
-  const nombre = document.getElementById('doc-nombre').value.trim();
+  var nombre = document.getElementById('doc-nombre').value.trim();
   if (!nombre) { toast('Ingresá un nombre para el template','err'); return; }
-  if (Object.keys(DOC_MAPEO).length === 0) { toast('Asigná al menos un campo','err'); return; }
+
+  // Leer asignaciones
+  var selects = document.querySelectorAll('.doc-lp-select');
+  var mapeo = [];
+  var sinAsignar = 0;
+  selects.forEach(function(s) {
+    var campo = s.value;
+    mapeo.push(campo || '');
+    if (!campo) sinAsignar++;
+  });
+
+  if (sinAsignar === selects.length) { toast('Asigná al menos un campo','err'); return; }
+  if (sinAsignar > 0) {
+    if (!confirm('Hay ' + sinAsignar + ' marcador(es) sin asignar. ¿Querés guardar igual?')) return;
+  }
 
   showLoading('Guardando template...');
-  const r = await api({
+  var r = await api({
     action: 'saveTemplate',
     token: SESSION.token,
-    nombre,
+    nombre: nombre,
     docId: DOC_DOCID,
-    mapeo: JSON.stringify(DOC_MAPEO)
+    mapeo: JSON.stringify(mapeo)
   });
   hideLoading();
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  toast('✓ Template "' + nombre + '" guardado', 'ok');
+  toast('✓ Template "' + nombre + '" guardado con ' + (mapeo.length - sinAsignar) + ' campos', 'ok');
   cancelarEditor();
   loadTemplates();
 }
@@ -2438,7 +2440,7 @@ function cancelarEditor() {
   document.getElementById('doc-id').value = '';
   DOC_MAPEO = {};
   DOC_DOCID = '';
-  DOC_HISTORIAL = [];
+  DOC_LP_POSITIONS = [];
 }
 
 async function loadTemplates() {
