@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -744,13 +744,21 @@ select.finp option{background:var(--bg2)}
 
         <!-- Importar Doc -->
         <div class="form-section" id="docs-import">
-          <div class="fsec-lbl">Importar Google Doc</div>
+          <div class="fsec-lbl">Documento de causa</div>
+          <div style="display:flex;gap:10px;margin-bottom:14px">
+            <button class="fab fab-green" id="btn-crear-doc" onclick="crearDoc()">📄 Crear documento nuevo</button>
+            <button class="fab fab-ghost" id="btn-editar-doc" onclick="editarDoc()" style="display:none">✏ Editar documento</button>
+          </div>
+          <div id="doc-creado-info" style="display:none;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:7px;padding:10px 14px;font-size:11px;color:var(--green);line-height:1.6;margin-bottom:12px">
+            ✓ Documento creado: <strong id="doc-creado-nombre"></strong><br>
+            <span style="font-size:10px;color:var(--text3)">Editalo en Google Docs, poné tus *LP* donde van los datos variables, y después hacé click en "Importar texto".</span>
+          </div>
           <div class="form-grid">
             <div class="fg span2">
               <label class="flbl">ID del Google Doc <span class="req">*</span></label>
-              <input class="finp" id="doc-id" type="text" placeholder="Pegá el ID del documento (ej: 1aBcDeFgHiJkLmNoPqRsTuVwXyZ)"/>
+              <input class="finp" id="doc-id" type="text" placeholder="Pegá el ID o creá uno nuevo con el botón de arriba"/>
               <div style="margin-top:6px;background:var(--bluebg);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--blue);line-height:1.6">
-                📋 El documento debe estar compartido con <strong style="user-select:all;cursor:pointer" title="Click para copiar">info@tasks-on.com</strong> (al menos como lector) para poder importarlo.
+                📋 Si usás un documento existente, debe estar compartido con <strong style="user-select:all;cursor:pointer">info@tasks-on.com</strong> como lector. Si usás "Crear documento nuevo" esto se hace automáticamente.
               </div>
             </div>
           </div>
@@ -2319,6 +2327,32 @@ async function cargarTDocumentos() {
 let DOC_MAPEO = {};
 let DOC_DOCID = '';
 let DOC_LP_POSITIONS = [];
+
+let DOC_CREATED_URL = '';
+
+async function crearDoc() {
+  showLoading('Creando documento...');
+  const r = await api({ action:'crearDoc', token:SESSION.token });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  document.getElementById('doc-id').value = r.docId;
+  document.getElementById('doc-creado-nombre').textContent = r.nombre;
+  document.getElementById('doc-creado-info').style.display = 'block';
+  document.getElementById('btn-editar-doc').style.display = 'inline-flex';
+  DOC_CREATED_URL = r.docUrl;
+  toast('✓ Documento creado. Editalo en Google Docs y después importalo.', 'ok');
+  window.open(r.docUrl, '_blank');
+}
+
+function editarDoc() {
+  if (DOC_CREATED_URL) {
+    window.open(DOC_CREATED_URL, '_blank');
+  } else {
+    var docId = document.getElementById('doc-id').value.trim();
+    if (docId) window.open('https://docs.google.com/document/d/' + docId + '/edit', '_blank');
+    else toast('No hay documento para editar','err');
+  }
+}
 
 async function importarDoc() {
   const docId = document.getElementById('doc-id').value.trim();
