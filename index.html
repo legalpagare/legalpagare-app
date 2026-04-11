@@ -742,7 +742,7 @@ select.finp option{background:var(--bg2)}
           <button class="reload-btn" onclick="loadTemplates()">↺ Actualizar</button>
         </div>
 
-        <!-- Importar Doc -->
+        <!-- Registrar Template -->
         <div class="form-section" id="docs-import">
           <div class="fsec-lbl">Documento de causa</div>
           <div style="display:flex;gap:10px;margin-bottom:14px">
@@ -751,40 +751,20 @@ select.finp option{background:var(--bg2)}
           </div>
           <div id="doc-creado-info" style="display:none;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:7px;padding:10px 14px;font-size:11px;color:var(--green);line-height:1.6;margin-bottom:12px">
             ✓ Documento creado: <strong id="doc-creado-nombre"></strong><br>
-            <span style="font-size:10px;color:var(--text3)">Editalo en Google Docs, poné tus *LP* donde van los datos variables, y después hacé click en "Importar texto".</span>
+            <span style="font-size:10px;color:var(--text3)">Editalo en Google Docs, poné los campos de la tabla donde van los datos variables, y después registralo.</span>
           </div>
           <div class="form-grid">
-            <div class="fg span2">
+            <div class="fg">
               <label class="flbl">ID del Google Doc <span class="req">*</span></label>
-              <input class="finp" id="doc-id" type="text" placeholder="Pegá el ID o creá uno nuevo con el botón de arriba"/>
-              <div style="margin-top:6px;background:var(--bluebg);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--blue);line-height:1.6">
-                📋 Si usás un documento existente, debe estar compartido con <strong style="user-select:all;cursor:pointer">info@tasks-on.com</strong> como lector. Si usás "Crear documento nuevo" esto se hace automáticamente.
-              </div>
+              <input class="finp" id="doc-id" type="text" placeholder="Pegá el ID o creá uno nuevo"/>
             </div>
-          </div>
-          <div style="margin-top:10px">
-            <button class="fab fab-green" onclick="importarDoc()">📥 Crear Template</button>
-          </div>
-        </div>
-
-        <!-- Editor de mapeo -->
-        <div class="form-section" id="docs-editor" style="display:none">
-          <div class="fsec-lbl">Mapear campos — <span id="doc-titulo" style="color:var(--green)"></span></div>
-          <div style="margin-bottom:12px;background:var(--bluebg);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:10px 14px;font-size:11px;color:var(--blue);line-height:1.6">
-            📌 Se detectaron <strong id="doc-lp-count">0</strong> campos en el documento. Verificá que sean correctos y guardá el template.
-          </div>
-          <div id="doc-texto" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:var(--text);max-height:300px;overflow-y:auto;white-space:pre-wrap;margin-bottom:14px"></div>
-          <div id="doc-mapeo-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
-          <div style="margin-top:8px;font-size:10px;color:var(--text3)" id="doc-mapeo-info">Campos asignados: 0</div>
-          <div style="margin-top:12px;display:flex;gap:8px">
-            <div class="fg" style="flex:1">
+            <div class="fg">
               <label class="flbl">Nombre del template <span class="req">*</span></label>
               <input class="finp" id="doc-nombre" type="text" placeholder="Ej: Reconocimiento de deuda USD"/>
             </div>
           </div>
-          <div style="margin-top:10px;display:flex;gap:8px">
-            <button class="fab fab-green" onclick="guardarTemplate()">💾 Guardar template</button>
-            <button class="fab fab-ghost" onclick="cancelarEditor()">Cancelar</button>
+          <div style="margin-top:10px">
+            <button class="fab fab-green" onclick="registrarTemplate()">💾 Registrar Template</button>
           </div>
         </div>
         <!-- Lista de templates -->
@@ -2324,8 +2304,6 @@ async function cargarTDocumentos() {
 // ════════════════════════════════════════════════════════
 //  MÓDULO DOCUMENTOS / TEMPLATES
 // ════════════════════════════════════════════════════════
-let DOC_DOCID = '';
-
 let DOC_CREATED_URL = '';
 
 async function crearDoc() {
@@ -2352,80 +2330,30 @@ function editarDoc() {
   }
 }
 
-async function importarDoc() {
-  const docId = document.getElementById('doc-id').value.trim();
-  if (!docId) { toast('Pegá el ID del Google Doc','err'); return; }
-  showLoading('Importando documento...');
-  const r = await api({ action:'importDoc', token:SESSION.token, docId });
-  hideLoading();
-  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  DOC_DOCID = docId;
-
-  var texto = r.texto;
-  var codigos = ['*NomDeu*','*DomDeu*','*LocDeu*','*Acree*','*TipDoc*','*NroDoc*','*Monto*','*MtoLet*','*Moned*','*Cuotas*','*FecEmi*','*PriVto*','*LugEmi*','*LugPag*','*ValRec*','*Orden*'];
-  var encontrados = codigos.filter(function(c) { return texto.indexOf(c) !== -1; });
-
-  if (encontrados.length === 0) {
-    toast('No se encontraron campos en el documento. Usá los códigos de la tabla (ej: *NomDeu*, *Monto*, etc.)','err');
-    return;
-  }
-
-  document.getElementById('doc-titulo').textContent = r.titulo;
-  document.getElementById('doc-nombre').value = r.titulo;
-  document.getElementById('doc-lp-count').textContent = encontrados.length;
-
-  var htmlTexto = esc(texto);
-  codigos.forEach(function(c) {
-    var re = c.replace(/\*/g, '\\*');
-    htmlTexto = htmlTexto.replace(new RegExp(re, 'g'),
-      '<span style="background:var(--greenbg);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:700;font-size:11px">' + c + '</span>');
-  });
-  document.getElementById('doc-texto').innerHTML = htmlTexto;
-
-  var nombres = {
-    '*NomDeu*':'Nombre del Deudor','*DomDeu*':'Domicilio','*LocDeu*':'Localidad',
-    '*Acree*':'Acreedor','*TipDoc*':'Tipo Doc.','*NroDoc*':'N° Doc.',
-    '*Monto*':'Monto Total','*MtoLet*':'Monto en Letras','*Moned*':'Moneda',
-    '*Cuotas*':'Cant. Cuotas','*FecEmi*':'Fecha Emisión','*PriVto*':'Primer Vto.',
-    '*LugEmi*':'Lugar Emisión','*LugPag*':'Lugar Pago','*ValRec*':'Valor Recibido','*Orden*':'N° Orden'
-  };
-  var listaHtml = encontrados.map(function(c) {
-    return '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:4px 10px;font-size:11px">' +
-      '<span style="font-family:var(--mono);font-weight:700;color:var(--green)">' + c + '</span>' +
-      '<span style="color:var(--text2)">→ ' + (nombres[c]||c) + '</span>' +
-    '</div>';
-  }).join('');
-  document.getElementById('doc-mapeo-lista').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + listaHtml + '</div>';
-  document.getElementById('doc-mapeo-info').textContent = encontrados.length + ' campos detectados automáticamente';
-  document.getElementById('docs-editor').style.display = 'block';
-  toast('✓ ' + r.titulo + ' — ' + encontrados.length + ' campos detectados', 'ok');
-}
-
-async function guardarTemplate() {
+async function registrarTemplate() {
+  var docId = document.getElementById('doc-id').value.trim();
   var nombre = document.getElementById('doc-nombre').value.trim();
+  if (!docId) { toast('Pegá el ID del Google Doc','err'); return; }
   if (!nombre) { toast('Ingresá un nombre para el template','err'); return; }
 
-  showLoading('Guardando template...');
+  showLoading('Registrando template...');
   var r = await api({
     action: 'saveTemplate',
     token: SESSION.token,
     nombre: nombre,
-    docId: DOC_DOCID,
+    docId: docId,
     mapeo: '[]'
   });
   hideLoading();
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  toast('✓ Template "' + nombre + '" guardado', 'ok');
-  cancelarEditor();
+  toast('✓ Template "' + nombre + '" registrado', 'ok');
+  document.getElementById('doc-id').value = '';
+  document.getElementById('doc-nombre').value = '';
+  document.getElementById('doc-creado-info').style.display = 'none';
+  document.getElementById('btn-editar-doc').style.display = 'none';
+  DOC_CREATED_URL = '';
   loadTemplates();
 }
-
-function cancelarEditor() {
-  document.getElementById('docs-editor').style.display = 'none';
-  document.getElementById('doc-id').value = '';
-  DOC_DOCID = '';
-}
-
 async function loadTemplates() {
   const r = await api({ action:'getTemplates', token:SESSION.token });
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
