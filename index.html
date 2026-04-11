@@ -2413,6 +2413,20 @@ function seleccionarTemplate(templateId, orden) {
   generarDesdeTemplate(templateId, orden);
 }
 async function generarDesdeTemplate(templateId, orden) {
+  // Verificar si tiene hash (impreso)
+  if (CURR_LOTE && !CURR_LOTE.hash) {
+    showModal('📄', 'Documento sin sello', 
+      'El documento se generará sin QR de autenticidad.\nEl QR se incluirá automáticamente luego de la impresión y entrega de los pagarés.',
+      async () => {
+        closeModal();
+        await ejecutarGeneracion(templateId, orden);
+      });
+    return;
+  }
+  await ejecutarGeneracion(templateId, orden);
+}
+
+async function ejecutarGeneracion(templateId, orden) {
   showLoading('Generando documento...');
   const r = await api({ action:'generarDocumento', token:SESSION.token, templateId, orden });
   hideLoading();
