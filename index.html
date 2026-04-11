@@ -2324,9 +2324,7 @@ async function cargarTDocumentos() {
 // ════════════════════════════════════════════════════════
 //  MÓDULO DOCUMENTOS / TEMPLATES
 // ════════════════════════════════════════════════════════
-let DOC_MAPEO = {};
 let DOC_DOCID = '';
-let DOC_LP_POSITIONS = [];
 
 let DOC_CREATED_URL = '';
 
@@ -2362,97 +2360,50 @@ async function importarDoc() {
   hideLoading();
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
   DOC_DOCID = docId;
-  DOC_MAPEO = {};
-  DOC_LP_POSITIONS = [];
 
-  // Buscar marcadores *LP* en el texto
-  const texto = r.texto;
-  const marker = '*LP*';
-  let idx = 0;
-  let pos = 0;
-  while ((pos = texto.indexOf(marker, pos)) !== -1) {
-    var ctxStart = Math.max(0, pos - 30);
-    var ctxEnd   = Math.min(texto.length, pos + marker.length + 30);
-    var before   = texto.substring(ctxStart, pos).replace(/\n/g,' ');
-    var after    = texto.substring(pos + marker.length, ctxEnd).replace(/\n/g,' ');
-    DOC_LP_POSITIONS.push({ index: idx, pos: pos, before: before, after: after });
-    idx++;
-    pos += marker.length;
-  }
+  var texto = r.texto;
+  var codigos = ['*NomDeu*','*DomDeu*','*LocDeu*','*Acree*','*TipDoc*','*NroDoc*','*Monto*','*MtoLet*','*Moned*','*Cuotas*','*FecEmi*','*PriVto*','*LugEmi*','*LugPag*','*ValRec*','*Orden*'];
+  var encontrados = codigos.filter(function(c) { return texto.indexOf(c) !== -1; });
 
-  if (DOC_LP_POSITIONS.length === 0) {
-    toast('No se encontraron marcadores *LP* en el documento. Agregá *LP* donde van los datos variables.','err');
+  if (encontrados.length === 0) {
+    toast('No se encontraron campos en el documento. Usá los códigos de la tabla (ej: *NomDeu*, *Monto*, etc.)','err');
     return;
   }
 
   document.getElementById('doc-titulo').textContent = r.titulo;
   document.getElementById('doc-nombre').value = r.titulo;
-  document.getElementById('doc-lp-count').textContent = DOC_LP_POSITIONS.length;
+  document.getElementById('doc-lp-count').textContent = encontrados.length;
 
-  // Mostrar texto con marcadores resaltados
-  var htmlTexto = esc(texto).replace(/\*LP\*/g,
-    '<span style="background:var(--amberbg);color:var(--amber);padding:1px 6px;border-radius:4px;font-weight:700;font-size:11px">*LP*</span>');
+  var htmlTexto = esc(texto);
+  codigos.forEach(function(c) {
+    var re = c.replace(/\*/g, '\\*');
+    htmlTexto = htmlTexto.replace(new RegExp(re, 'g'),
+      '<span style="background:var(--greenbg);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:700;font-size:11px">' + c + '</span>');
+  });
   document.getElementById('doc-texto').innerHTML = htmlTexto;
 
-  // Generar lista de asignación
-  var selectOpts =
-    '<option value="">-- Elegir campo --</option>' +
-    '<option value="DEUDOR_NOMBRE">Nombre del Deudor</option>' +
-    '<option value="DEUDOR_DOMICILIO">Domicilio del Deudor</option>' +
-    '<option value="DEUDOR_LOCALIDAD">Localidad del Deudor</option>' +
-    '<option value="ACREEDOR">Acreedor</option>' +
-    '<option value="TIPO_DOC">Tipo Documento</option>' +
-    '<option value="NRO_DOC">N° Documento</option>' +
-    '<option value="MONTO_TOTAL">Monto Total</option>' +
-    '<option value="MONTO_LETRAS">Monto en Letras</option>' +
-    '<option value="MONEDA">Moneda</option>' +
-    '<option value="CANT_CUOTAS">Cantidad de Cuotas</option>' +
-    '<option value="FECHA_EMISION">Fecha de Emisión</option>' +
-    '<option value="PRIMER_VTO">Primer Vencimiento</option>' +
-    '<option value="LUGAR_EMISION">Lugar de Emisión</option>' +
-    '<option value="LUGAR_PAGO">Lugar de Pago</option>' +
-    '<option value="VALOR_RECIBIDO">Valor Recibido</option>' +
-    '<option value="ORDEN">N° Orden</option>';
-
-  var listaHtml = DOC_LP_POSITIONS.map(function(lp) {
-    return '<div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">' +
-      '<span style="font-family:var(--mono);font-size:11px;color:var(--amber);font-weight:700;white-space:nowrap">*LP* #' + (lp.index+1) + '</span>' +
-      '<span style="font-size:11px;color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="...'+esc(lp.before)+' *LP* '+esc(lp.after)+'...">...' + esc(lp.before) + ' <strong style="color:var(--amber)">*LP*</strong> ' + esc(lp.after) + '...</span>' +
-      '<select class="finp doc-lp-select" data-index="' + lp.index + '" style="max-width:200px;flex-shrink:0" onchange="actualizarMapeoInfo()">' + selectOpts + '</select>' +
+  var nombres = {
+    '*NomDeu*':'Nombre del Deudor','*DomDeu*':'Domicilio','*LocDeu*':'Localidad',
+    '*Acree*':'Acreedor','*TipDoc*':'Tipo Doc.','*NroDoc*':'N° Doc.',
+    '*Monto*':'Monto Total','*MtoLet*':'Monto en Letras','*Moned*':'Moneda',
+    '*Cuotas*':'Cant. Cuotas','*FecEmi*':'Fecha Emisión','*PriVto*':'Primer Vto.',
+    '*LugEmi*':'Lugar Emisión','*LugPag*':'Lugar Pago','*ValRec*':'Valor Recibido','*Orden*':'N° Orden'
+  };
+  var listaHtml = encontrados.map(function(c) {
+    return '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:4px 10px;font-size:11px">' +
+      '<span style="font-family:var(--mono);font-weight:700;color:var(--green)">' + c + '</span>' +
+      '<span style="color:var(--text2)">→ ' + (nombres[c]||c) + '</span>' +
     '</div>';
   }).join('');
-
-  document.getElementById('doc-mapeo-lista').innerHTML = listaHtml;
-  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: 0 / ' + DOC_LP_POSITIONS.length;
+  document.getElementById('doc-mapeo-lista').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + listaHtml + '</div>';
+  document.getElementById('doc-mapeo-info').textContent = encontrados.length + ' campos detectados automáticamente';
   document.getElementById('docs-editor').style.display = 'block';
-  toast('✓ Documento importado: ' + r.titulo + ' — ' + DOC_LP_POSITIONS.length + ' marcadores encontrados', 'ok');
-}
-
-function actualizarMapeoInfo() {
-  var selects = document.querySelectorAll('.doc-lp-select');
-  var count = 0;
-  selects.forEach(function(s) { if (s.value) count++; });
-  document.getElementById('doc-mapeo-info').textContent = 'Campos asignados: ' + count + ' / ' + DOC_LP_POSITIONS.length;
+  toast('✓ ' + r.titulo + ' — ' + encontrados.length + ' campos detectados', 'ok');
 }
 
 async function guardarTemplate() {
   var nombre = document.getElementById('doc-nombre').value.trim();
   if (!nombre) { toast('Ingresá un nombre para el template','err'); return; }
-
-  // Leer asignaciones
-  var selects = document.querySelectorAll('.doc-lp-select');
-  var mapeo = [];
-  var sinAsignar = 0;
-  selects.forEach(function(s) {
-    var campo = s.value;
-    mapeo.push(campo || '');
-    if (!campo) sinAsignar++;
-  });
-
-  if (sinAsignar === selects.length) { toast('Asigná al menos un campo','err'); return; }
-  if (sinAsignar > 0) {
-    if (!confirm('Hay ' + sinAsignar + ' marcador(es) sin asignar. ¿Querés guardar igual?')) return;
-  }
 
   showLoading('Guardando template...');
   var r = await api({
@@ -2460,11 +2411,11 @@ async function guardarTemplate() {
     token: SESSION.token,
     nombre: nombre,
     docId: DOC_DOCID,
-    mapeo: JSON.stringify(mapeo)
+    mapeo: '[]'
   });
   hideLoading();
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  toast('✓ Template "' + nombre + '" guardado con ' + (mapeo.length - sinAsignar) + ' campos', 'ok');
+  toast('✓ Template "' + nombre + '" guardado', 'ok');
   cancelarEditor();
   loadTemplates();
 }
@@ -2472,9 +2423,7 @@ async function guardarTemplate() {
 function cancelarEditor() {
   document.getElementById('docs-editor').style.display = 'none';
   document.getElementById('doc-id').value = '';
-  DOC_MAPEO = {};
   DOC_DOCID = '';
-  DOC_LP_POSITIONS = [];
 }
 
 async function loadTemplates() {
