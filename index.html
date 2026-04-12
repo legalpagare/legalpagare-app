@@ -922,6 +922,17 @@ select.finp option{background:var(--bg2)}
 
   </div>
 </div>
+<!-- Modal detalle operación -->
+<div class="overlay" id="detalle-overlay">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <div class="modal-icon">📋</div>
+    <div class="modal-title" id="detalle-title">Detalle operación</div>
+    <div id="detalle-body" style="text-align:left;font-size:12px;color:var(--text2);line-height:2"></div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="mbtn mbtn-cancel" style="flex:1" onclick="document.getElementById('detalle-overlay').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
 <!-- Modal registrar cobro -->
 <div class="overlay" id="cobro-overlay">
   <div class="modal" style="max-width:520px">
@@ -1568,6 +1579,7 @@ function renderTable(lotes){
       <td style="white-space:nowrap;display:flex;gap:5px">
       
         <button class="tact" onclick="openLote('${l.orden}')">Ver / Imprimir</button>
+        <button class="tact" style="padding:5px 7px" title="Detalle de la operación" onclick="verDetalle('${l.orden}',event)">📋</button>
         ${l.estado!=='IMPRESO'?'':''}
         <button class="tact" style="color:var(--text3);border-color:transparent" title="Ocultar de la lista" onclick="ocultarOp('${l.orden}',event)">✕</button>
       </td>
@@ -2457,6 +2469,66 @@ async function ejecutarGeneracion(templateId, orden) {
   hideLoading();
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
   toast('✓ ' + r.mensaje, 'ok');
+}
+async function verDetalle(orden, evt) {
+  if (evt) evt.stopPropagation();
+  showLoading('Cargando detalle...');
+  const r = await api({action:'getLote',token:SESSION.token,orden});
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  var l = r.lote;
+  var deudorParts = (l.deudor||'').split('|||');
+  var esDolar = l.moneda==='USD';
+  var simb = esDolar?'U$S':'$';
+  var dec = esDolar?2:0;
+  var modoLabel = {'CUOTAS_IGUALES':'Cuotas iguales','CUOTA_FIJA':'Cuota fija','FINANCIERO':'Financiero'}[l.modo]||l.modo;
+
+  var campo = function(label, val) {
+    if (!val) return '';
+    return '<div style="display:flex;border-bottom:1px solid var(--border);padding:4px 0">' +
+      '<span style="color:var(--text3);width:160px;flex-shrink:0;font-size:11px">' + label + '</span>' +
+      '<span style="color:var(--text);font-weight:500">' + esc(val) + '</span></div>';
+  };
+
+  var html =
+    campo('Orden', '#' + l.orden) +
+    campo('Estado', l.estado) +
+    campo('Fecha carga', l.fecha) +
+    campo('Modo', modoLabel) +
+    '<div style="height:8px"></div>' +
+    campo('Deudor', deudorParts[0]||'') +
+    campo('Domicilio', deudorParts[1]||'') +
+    campo('Localidad', deudorParts[2]||'') +
+    campo('Tipo Doc.', l.tipoDoc) +
+    campo('N° Doc.', l.nroDoc) +
+    campo('Acreedor', l.acreedor||'A la orden / endosable') +
+    '<div style="height:8px"></div>' +
+    campo('Moneda', simb) +
+    campo('Monto total', simb + ' ' + fmtN(l.montoTotal, dec)) +
+    campo('Cuotas', String(l.cantCuotas)) +
+    campo('1° Vencimiento', fmtISODate(l.fechaVtoInic)) +
+    campo('Fecha emisión', fmtISODate(l.fechaEmision)) +
+    campo('Lugar emisión', l.lugarEmision) +
+    campo('Lugar de pago', l.lugarPago) +
+    campo('Valor recibido', l.valRecibido);
+
+  if (l.modo === 'FINANCIERO') {
+    html += '<div style="height:8px"></div>' +
+      campo('Sistema', l.sistemaFin) +
+      campo('Tasa', l.tasa + '% ' + l.tipoTasa);
+  }
+
+  if (l.fechaImpresion) {
+    html += '<div style="height:8px"></div>' +
+      campo('Fecha impresión', l.fechaImpresion);
+  }
+  if (l.hash) {
+    html += campo('Hash', l.hash.slice(0, 20) + '...');
+  }
+
+  document.getElementById('detalle-title').textContent = 'Operación #' + l.orden;
+  document.getElementById('detalle-body').innerHTML = html;
+  document.getElementById('detalle-overlay').classList.add('show');
 }
 // ════════════════════════════════════════════════════════
 //  MÓDULO COBRANZAS
