@@ -386,6 +386,7 @@ select.finp option{background:var(--bg2)}
 #print-area{display:none}
 #report-print-area{display:none}
 /* Sello al pie: solo visible al imprimir */
+.pg-cobrado{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);font-size:38px;font-weight:900;font-family:Arial,sans-serif;color:rgba(239,68,68,.35);letter-spacing:6px;text-transform:uppercase;pointer-events:none;z-index:3;white-space:nowrap}
 .pg-sello{ display:none; }
 @media print{
   @page{size:A4 landscape;margin:5mm 6mm}
@@ -1573,12 +1574,16 @@ function renderTable(lotes){
     </tr>`;
   }).join('');
 }
+let CURR_COBRADOS = [];
+
 async function openLote(orden){
   showLoading('Cargando...');
   const r = await api({action:'getLote',token:SESSION.token,orden});
+  if (!r.ok){ hideLoading(); toast('Error: '+r.error,'err'); return; }
+  // Cargar cobranzas
+  const rc = await api({action:'getCobranzas',token:SESSION.token,orden});
   hideLoading();
-  if (!r.ok){ toast('Error: '+r.error,'err'); return; }
-  // Recalcular serie desde los parámetros guardados
+  CURR_COBRADOS = rc.ok ? rc.cobranzas.map(c => c.nroPagare) : [];
   const serie = recalcularDesdeLote(r.lote);
   CURR_LOTE=r.lote; CURR_SERIE=serie;
   goTab('vista');
@@ -1633,7 +1638,11 @@ function renderVista(lote, serie){
   const isPend   = lote.estado==='PENDIENTE';
   const isSaved  = !!lote.orden;
 
-  const sheets   = chunk2(serie.map((s,i)=>mkPagareObj(s, i, n, lote)));
+  const sheets   = chunk2(serie.map((s,i)=>{
+    var obj = mkPagareObj(s, i, n, lote);
+    obj.cobrado = CURR_COBRADOS.includes(i+1);
+    return obj;
+  }));
 
   const impNotice = !isPend && isSaved
     ? `<span class="imp-notice">✓ Impreso el ${esc(lote.fechaImpresion)}${lote.hash?' &nbsp;·&nbsp; 🔐 '+lote.hash.slice(0,12)+'...':''}</span>` : '';
@@ -1715,6 +1724,7 @@ function mkPagareHTML(p){
   return `<div class="pagare-wrap">
   <div class="pagare">
   <div class="pg-deco"></div>
+  ${p.cobrado?'<div class="pg-cobrado">COBRADO</div>':''}
   <div class="pg-body">
     <div class="pg-r1">
       <div class="pg-field"><span class="pg-lbl">Sellado</span><span class="pg-val">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
