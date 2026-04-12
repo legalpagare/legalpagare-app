@@ -1675,6 +1675,7 @@ function renderVista(lote, serie){
         <button class="vbtn vbtn-pdf" onclick="generarReportePDF()">📄 Reporte PDF</button>
         ${isSaved?'<button class="vbtn vbtn-pdf" onclick="elegirTemplate(\''+esc(lote.orden)+'\')">📄 Generar documento</button>':''}
         ${isSaved && !isPend?'<button class="vbtn vbtn-excel" onclick="abrirCobro(\''+esc(lote.orden)+'\')">💰 Registrar cobro</button>':''}
+        ${isSaved && CURR_COBRADOS.length>0?'<button class="vbtn vbtn-pdf" onclick="reporteCobranzas()">📊 Reporte cobranzas</button>':''}
         ${impNotice}
       </div>
     </div>
@@ -2539,7 +2540,126 @@ async function confirmarCobro() {
       }
     });
 }
+async function reporteCobranzas() {
+  showLoading('Generando reporte...');
+  const r = await api({ action:'getCobranzas', token:SESSION.token });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  if (!r.cobranzas.length) { toast('No hay cobranzas registradas','inf'); return; }
 
+  var cobros = r.cobranzas;
+
+  // ── Por operación ──
+  var porOrden = {};
+  cobros.forEach(function(c) {
+    var key = String(c.orden);
+    if (!porOrden[key]) porOrden[key] = { deudor:c.deudor, acreedor:c.acreedor, moneda:c.moneda, items:[], total:0 };
+    porOrden[key].items.push(c);
+    porOrden[key].total += parseFloat(c.monto) || 0;
+  });
+
+  // ── Por deudor ──
+  var porDeudor = {};
+  cobros.forEach(function(c) {
+    var key = String(c.deudor||'Sin nombre').trim();
+    if (!porDeudor[key]) porDeudor[key] = { monedas:{} };
+    var mon = c.moneda || 'USD';
+    if (!porDeudor[key].monedas[mon]) porDeudor[key].monedas[mon] = { total:0, cant:0 };
+    porDeudor[key].monedas[mon].total += parseFloat(c.monto) || 0;
+    porDeudor[key].monedas[mon].cant++;
+  });
+
+  // ── Totales por moneda ──
+  var porMoneda = {};
+  cobros.forEach(function(c) {
+    var mon = c.moneda || 'USD';
+    if (!porMoneda[mon]) porMoneda[mon] = { total:0, cant:0 };
+    porMoneda[mon].total += parseFloat(c.monto) || 0;
+    porMoneda[mon].cant++;
+  });
+
+  // ── Render HTML ──
+  var simbFor = function(m) { return (m==='USD'||m==='U$D') ? 'U$S' : '$'; };
+  var decFor  = function(m) { return (m==='USD'||m==='U$D') ? 2 : 0; };
+
+  // Tabla por operación
+  var tblOrden = '';
+  for (var ord in porOrden) {
+    var info = porOrden[ord];
+    var s = simbFor(info.moneda);
+    var d = decFor(info.moneda);
+    var nums = info.items.map(function(i){ return i.nroPagare; }).sort(function(a,b){return a-b;});
+    tblOrden += '<tr>' +
+      '<td style="padding:6px 10px;font-family:monospace;font-weight:700">#' + ord + '</td>' +
+      '<td style="padding:6px 10px">' + esc(info.deudor) + '</td>' +
+      '<td style="padding:6px 10px">' + esc(info.acreedor) + '</td>' +
+      '<td style="padding:6px 10px;text-align:center">' + nums.join(', ') + '</td>' +
+      '<td style="padding:6px 10px;text-align:center">' + info.items.length + '</td>' +
+      '<td style="padding:6px 10px;text-align:right;font-weight:600">' + s + ' ' + fmtN(info.total, d) + '</td>' +
+    '</tr>';
+  }
+
+  // Tabla por deudor
+  var tblDeudor = '';
+  for (var deu in porDeudor) {
+    var monedas = porDeudor[deu].monedas;
+    for (var mon in monedas) {
+      var s2 = simbFor(mon);
+      var d2 = decFor(mon);
+      tblDeudor += '<tr>' +
+        '<td style="padding:6px 10px;font-weight:600">' + esc(deu) + '</td>' +
+        '<td style="padding:6px 10px;text-align:center">' + monedas[mon].cant + '</td>' +
+        '<td style="padding:6px 10px;text-align:right;font-weight:600">' + s2 + ' ' + fmtN(monedas[mon].total, d2) + '</td>' +
+      '</tr>';
+    }
+  }
+
+  // Tabla totales por moneda
+  var tblMoneda = '';
+  for (var mon2 in porMoneda) {
+    var s3 = simbFor(mon2);
+    var d3 = decFor(mon2);
+    tblMoneda += '<tr>' +
+      '<td style="padding:6px 10px;font-weight:700">' + s3 + '</td>' +
+      '<td style="padding:6px 10px;text-align:center">' + porMoneda[mon2].cant + '</td>' +
+      '<td style="padding:6px 10px;text-align:right;font-weight:700;color:var(--green)">' + s3 + ' ' + fmtN(porMoneda[mon2].total, d3) + '</td>' +
+    '</tr>';
+  }
+
+  var fechaRpt = new Date().toLocaleString('es-AR');
+
+  var html = '<div style="max-width:860px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+      '<div><div style="font-size:18px;font-weight:700;color:var(--text)">📊 Reporte de Cobranzas</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:3px">Generado: ' + fechaRpt + '</div></div>' +
+      '<button class="vbtn vbtn-reprint" onclick="goTab(\'vista\')">← Volver</button>' +
+    '</div>' +
+
+    '<div style="margin-bottom:24px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Totales por moneda</div>' +
+      '<div class="tbl-wrap"><table class="tbl">' +
+      '<thead><tr><th>Moneda</th><th style="text-align:center">Pagarés</th><th style="text-align:right">Total cobrado</th></tr></thead>' +
+      '<tbody>' + tblMoneda + '</tbody></table></div>' +
+    '</div>' +
+
+    '<div style="margin-bottom:24px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por operación</div>' +
+      '<div class="tbl-wrap"><table class="tbl">' +
+      '<thead><tr><th>Op.</th><th>Deudor</th><th>Acreedor</th><th style="text-align:center">Pagarés</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>' +
+      '<tbody>' + tblOrden + '</tbody></table></div>' +
+    '</div>' +
+
+    '<div style="margin-bottom:24px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por deudor</div>' +
+      '<div class="tbl-wrap"><table class="tbl">' +
+      '<thead><tr><th>Deudor</th><th style="text-align:center">Pagarés</th><th style="text-align:right">Total cobrado</th></tr></thead>' +
+      '<tbody>' + tblDeudor + '</tbody></table></div>' +
+    '</div>' +
+
+  '</div>';
+
+  document.getElementById('vista-content').innerHTML = html;
+}
 
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
