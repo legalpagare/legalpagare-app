@@ -921,6 +921,20 @@ select.finp option{background:var(--bg2)}
 
   </div>
 </div>
+<!-- Modal registrar cobro -->
+<div class="overlay" id="cobro-overlay">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-icon">💰</div>
+    <div class="modal-title">Registrar cobro</div>
+    <div id="cobro-info" style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:14px"></div>
+    <div id="cobro-lista" style="max-height:340px;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:4px"></div>
+    <div id="cobro-resumen" style="font-size:12px;color:var(--green);font-weight:600;text-align:center;margin-bottom:12px"></div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('cobro-overlay').classList.remove('show')">Cancelar</button>
+      <button class="mbtn mbtn-confirm" id="cobro-confirmar" onclick="confirmarCobro()">💰 Confirmar cobro</button>
+    </div>
+  </div>
+</div>
 <!-- Modal selector de template -->
 <div class="overlay" id="tpl-overlay">
   <div class="modal" style="max-width:460px">
@@ -1651,6 +1665,7 @@ function renderVista(lote, serie){
         <button class="vbtn vbtn-excel" onclick="generarExcel()">📊 Excel</button>
         <button class="vbtn vbtn-pdf" onclick="generarReportePDF()">📄 Reporte PDF</button>
         ${isSaved?'<button class="vbtn vbtn-pdf" onclick="elegirTemplate(\''+esc(lote.orden)+'\')">📄 Generar documento</button>':''}
+        ${isSaved && !isPend?'<button class="vbtn vbtn-excel" onclick="abrirCobro(\''+esc(lote.orden)+'\')">💰 Registrar cobro</button>':''}
         ${impNotice}
       </div>
     </div>
@@ -2432,6 +2447,89 @@ async function ejecutarGeneracion(templateId, orden) {
   if (!r.ok) { toast('Error: '+r.error,'err'); return; }
   toast('✓ ' + r.mensaje, 'ok');
 }
+// ════════════════════════════════════════════════════════
+//  MÓDULO COBRANZAS
+// ════════════════════════════════════════════════════════
+let COBROS_ORDEN = '';
+let COBROS_YA = [];
+
+async function abrirCobro(orden) {
+  COBROS_ORDEN = orden;
+  showLoading('Cargando cobranzas...');
+  const r = await api({ action:'getCobranzas', token:SESSION.token, orden });
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  COBROS_YA = r.cobranzas.map(c => c.nroPagare);
+
+  const lote = CURR_LOTE;
+  const esDolar = lote.moneda==='USD';
+  const simb = esDolar?'U$S':'$';
+  const dec = esDolar?2:0;
+  const n = CURR_SERIE.length;
+  const cobrados = COBROS_YA.length;
+
+  document.getElementById('cobro-info').innerHTML =
+    'Op <strong>#' + esc(orden) + '</strong> · ' + esc((lote.deudor||'').split('|||')[0]) +
+    '<br>' + cobrados + ' de ' + n + ' pagarés cobrados';
+
+  var listaHtml = CURR_SERIE.map(function(s, i) {
+    var nro = i + 1;
+    var yaCobrado = COBROS_YA.includes(nro);
+    var monto = simb + ' ' + fmtN(s.monto, dec);
+    var vto = fmtFecha(s.vencimiento);
+    if (yaCobrado) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:7px;opacity:.7">' +
+        '<span style="font-size:16px">✅</span>' +
+        '<span style="flex:1;font-size:11px;color:var(--green)"><strong>N° ' + nro + '</strong> · ' + vto + ' · ' + monto + ' — <em>Cobrado</em></span>' +
+      '</div>';
+    }
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;cursor:pointer" onclick="toggleCobro(this,' + nro + ')">' +
+      '<input type="checkbox" class="cobro-chk" data-nro="' + nro + '" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer"/>' +
+      '<span style="flex:1;font-size:11px;color:var(--text)"><strong>N° ' + nro + '</strong> · ' + vto + ' · ' + monto + '</span>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('cobro-lista').innerHTML = listaHtml;
+  actualizarResumenCobro();
+  document.getElementById('cobro-overlay').classList.add('show');
+}
+
+function toggleCobro(el, nro) {
+  var chk = el.querySelector('.cobro-chk');
+  if (chk) chk.checked = !chk.checked;
+  actualizarResumenCobro();
+}
+
+function actualizarResumenCobro() {
+  var checks = document.querySelectorAll('.cobro-chk:checked');
+  var n = checks.length;
+  var resumen = document.getElementById('cobro-resumen');
+  resumen.textContent = n > 0 ? n + ' pagaré' + (n>1?'s':'') + ' seleccionado' + (n>1?'s':'') : '';
+}
+
+async function confirmarCobro() {
+  var checks = document.querySelectorAll('.cobro-chk:checked');
+  if (checks.length === 0) { toast('Seleccioná al menos un pagaré','err'); return; }
+
+  var nums = Array.from(checks).map(c => c.dataset.nro).join(',');
+
+  showModal('💰', '¿Confirmar cobro?',
+    checks.length + ' pagaré' + (checks.length>1?'s':'') + ' de la operación #' + COBROS_ORDEN + '\nEsta acción quedará registrada.',
+    async () => {
+      closeModal();
+      document.getElementById('cobro-overlay').classList.remove('show');
+      showLoading('Registrando cobro...');
+      var r = await api({ action:'registrarCobro', token:SESSION.token, orden:COBROS_ORDEN, pagares:nums });
+      hideLoading();
+      if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+      toast('✓ ' + r.mensaje, 'ok');
+      // Refrescar vista
+      if (CURR_LOTE && CURR_LOTE.orden === COBROS_ORDEN) {
+        openLote(COBROS_ORDEN);
+      }
+    });
+}
+
 
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
