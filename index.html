@@ -1469,7 +1469,14 @@ async function saveLote(){
       const r = await api(params);
       hideLoading();
       if (!r.ok){ toast('Error: '+r.error,'err'); return; }
-      const cupoRestante = (SESSION.user.cupo - SESSION.user.cupoUsado - 1);
+      // OPT: usar cupo devuelto por el backend en lugar de llamar loadStats (ahorra 1 request)
+      if (r.cupo !== undefined && r.cupoUsado !== undefined) {
+        SESSION.user.cupo = r.cupo;
+        SESSION.user.cupoUsado = r.cupoUsado;
+        localStorage.setItem('pg_sess', JSON.stringify(SESSION));
+        updateCupo(r.cupo, r.cupoUsado);
+      }
+      const cupoRestante = (SESSION.user.cupo - SESSION.user.cupoUsado);
       const cupoMsg = SESSION.user.esAdmin ? '' : ` — te quedan ${cupoRestante} crédito${cupoRestante!==1?'s':''}`;
       toast('✓ Operación #'+r.orden+' guardada'+cupoMsg,'ok');
       // Privacidad Extrema: notificar por correo
@@ -1491,7 +1498,16 @@ async function saveLote(){
         });
         toast('📧 Resumen enviado a tu correo','inf');
       }
-      ALL_LOTES=[]; loadStats();
+      // OPT: no limpiamos ALL_LOTES, solo marcamos para refresh lazy al entrar al tab
+      ALL_LOTES=[];
+      // OPT: actualizar badge pendientes localmente (uno más)
+      const badgePend = document.getElementById('badge-pend');
+      if (badgePend) {
+        const m = badgePend.textContent ? badgePend.textContent.match(/(\d+)/) : null;
+        const n = (m ? parseInt(m[1]) : 0) + 1;
+        badgePend.textContent = 'Pendientes: ' + n;
+        badgePend.classList.add('show');
+      }
       setTimeout(()=>goTab('browser'),600);
     }
   );
@@ -1590,11 +1606,13 @@ let CURR_COBRADOS = [];
 
 async function openLote(orden){
   showLoading('Cargando...');
-  const r = await api({action:'getLote',token:SESSION.token,orden});
-  if (!r.ok){ hideLoading(); toast('Error: '+r.error,'err'); return; }
-  // Cargar cobranzas
-  const rc = await api({action:'getCobranzas',token:SESSION.token,orden});
+  // OPT: paralelizar getLote + getCobranzas (antes iban en serie ~900ms, ahora ~500ms)
+  const [r, rc] = await Promise.all([
+    api({action:'getLote',token:SESSION.token,orden}),
+    api({action:'getCobranzas',token:SESSION.token,orden})
+  ]);
   hideLoading();
+  if (!r.ok){ toast('Error: '+r.error,'err'); return; }
   CURR_COBRADOS = rc.ok ? rc.cobranzas.map(c => c.nroPagare) : [];
   const serie = recalcularDesdeLote(r.lote);
   CURR_LOTE=r.lote; CURR_SERIE=serie;
@@ -1866,7 +1884,18 @@ async function doPrint(){
         await new Promise(res => setTimeout(res, 200));
         window.print();
         document.title = oldTitle;
-        ALL_LOTES=[]; loadStats();
+        // OPT: solo marcamos lotes para refrescar al volver al browser, sin pedir stats (no cambiaron cupo ni pendientes significativamente)
+        ALL_LOTES=[];
+        // OPT: actualizar badge pendientes localmente (uno menos)
+        const badge = document.getElementById('badge-pend');
+        if (badge && badge.textContent) {
+          const m = badge.textContent.match(/(\d+)/);
+          if (m) {
+            const n = Math.max(0, parseInt(m[1]) - 1);
+            if (n > 0) badge.textContent = 'Pendientes: ' + n;
+            else badge.classList.remove('show');
+          }
+        }
         if (r.hash) toast('🔐 Sello impreso y enviado a las partes','ok');
         else        toast('✓ Documento marcado como entregado','ok');
       });
@@ -2595,6 +2624,7 @@ async function confirmarCobro() {
   if (checks.length === 0) { toast('Seleccioná al menos un pagaré','err'); return; }
 
   var nums = Array.from(checks).map(c => c.dataset.nro).join(',');
+  var numsArr = Array.from(checks).map(c => parseInt(c.dataset.nro));
 
   showModal('💰', '¿Confirmar cobro?',
     checks.length + ' pagaré' + (checks.length>1?'s':'') + ' de la operación #' + COBROS_ORDEN + '\nEsta acción quedará registrada.',
@@ -2606,9 +2636,10 @@ async function confirmarCobro() {
       hideLoading();
       if (!r.ok) { toast('Error: '+r.error,'err'); return; }
       toast('✓ ' + r.mensaje, 'ok');
-      // Refrescar vista
+      // OPT: actualizar CURR_COBRADOS localmente y re-renderizar sin fetch adicional
       if (CURR_LOTE && CURR_LOTE.orden === COBROS_ORDEN) {
-        openLote(COBROS_ORDEN);
+        numsArr.forEach(n => { if (!CURR_COBRADOS.includes(n)) CURR_COBRADOS.push(n); });
+        renderVista(CURR_LOTE, CURR_SERIE);
       }
     });
 }
