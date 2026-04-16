@@ -499,6 +499,7 @@ select.finp option{background:var(--bg2)}
         <button class="nav-btn" id="nav-browser" onclick="goTab('browser')"><span class="nav-icon">📋</span>Mis operaciones<span class="nav-badge" id="badge-pend">Pendientes: 0</span></button>
         <button class="nav-btn" id="nav-vista" onclick="goTab('vista')"><span class="nav-icon">🖨</span>Vista previa</button>
         <button class="nav-btn" id="nav-docs" onclick="goTab('docs')"><span class="nav-icon">📄</span>Documentos</button>
+        <button class="nav-btn" id="nav-cobranzas" onclick="goTab('cobranzas')"><span class="nav-icon">📊</span>Cobranzas</button>
       </div>
     </div>
     <div class="sb-footer">
@@ -777,6 +778,29 @@ select.finp option{background:var(--bg2)}
               <tbody id="docs-tbody"><tr><td colspan="5" class="empty-tbl">Sin templates</td></tr></tbody>
             </table>
           </div>
+        </div>
+      </div>
+      <!-- ═══ TAB COBRANZAS ═══ -->
+      <div id="tab-cobranzas" style="display:none">
+        <div class="browser-toolbar">
+          <div class="filter-btns">
+            <button class="fbtn active" id="cob-filtro-todos" onclick="setCobFiltro('todos',this)">Todas</button>
+            <button class="fbtn" onclick="setCobFiltro('pendiente',this)">Pendientes</button>
+            <button class="fbtn" onclick="setCobFiltro('vencido',this)">Vencidos</button>
+            <button class="fbtn" onclick="setCobFiltro('cobrado',this)">Cobrados</button>
+          </div>
+          <input class="search-inp" id="cob-search" placeholder="Buscar deudor..." oninput="renderCobGeneral()"/>
+          <select class="finp" id="cob-periodo" onchange="renderCobGeneral()" style="max-width:160px;padding:6px 10px;font-size:11px">
+            <option value="todo">Todo el período</option>
+            <option value="mes">Este mes</option>
+            <option value="trim">Últimos 3 meses</option>
+            <option value="sem">Últimos 6 meses</option>
+            <option value="anio">Este año</option>
+          </select>
+          <button class="reload-btn" onclick="loadCobGeneral()">↺ Actualizar</button>
+        </div>
+        <div id="cob-general-content">
+          <div class="vista-empty"><div class="ve-icon">📊</div><div class="ve-title">Cargando cobranzas...</div></div>
         </div>
       </div>
       <!-- ═══ TAB VISTA ═══ -->
@@ -1200,7 +1224,7 @@ async function loadStats(){
 //  TABS
 // ════════════════════════════════════════════════════════
 function goTab(tab){
-  ['nueva','browser','vista','docs'].forEach(t=>{
+  ['nueva','browser','vista','docs','cobranzas'].forEach(t=>{
     document.getElementById('tab-'+t).style.display  = t===tab?'block':'none';
     document.getElementById('nav-'+t).classList.toggle('active',t===tab);
   });
