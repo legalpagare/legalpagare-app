@@ -2644,126 +2644,161 @@ async function confirmarCobro() {
     });
 }
 async function reporteCobranzas() {
-  showLoading('Generando reporte...');
-  const r = await api({ action:'getCobranzas', token:SESSION.token });
-  hideLoading();
-  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
-  if (!r.cobranzas.length) { toast('No hay cobranzas registradas','inf'); return; }
+  if (!CURR_LOTE || !CURR_SERIE.length) { toast('Sin operación cargada','err'); return; }
 
-  var cobros = r.cobranzas;
+  const lote = CURR_LOTE;
+  const serie = CURR_SERIE;
+  const esDolar = lote.moneda==='USD';
+  const simb = esDolar?'U$S':'$';
+  const dec = esDolar?2:0;
+  const n = serie.length;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
 
-  // ── Por operación ──
-  var porOrden = {};
-  cobros.forEach(function(c) {
-    var key = String(c.orden);
-    if (!porOrden[key]) porOrden[key] = { deudor:c.deudor, acreedor:c.acreedor, moneda:c.moneda, items:[], total:0 };
-    porOrden[key].items.push(c);
-    porOrden[key].total += parseFloat(c.monto) || 0;
-  });
+  // Calcular estados
+  var totalCobrado = 0, totalPendiente = 0, totalVencido = 0;
+  var cantCobrado = 0, cantPendiente = 0, cantVencido = 0;
 
-  // ── Por deudor ──
-  var porDeudor = {};
-  cobros.forEach(function(c) {
-    var key = String(c.deudor||'Sin nombre').trim();
-    if (!porDeudor[key]) porDeudor[key] = { monedas:{} };
-    var mon = c.moneda || 'USD';
-    if (!porDeudor[key].monedas[mon]) porDeudor[key].monedas[mon] = { total:0, cant:0 };
-    porDeudor[key].monedas[mon].total += parseFloat(c.monto) || 0;
-    porDeudor[key].monedas[mon].cant++;
-  });
-
-  // ── Totales por moneda ──
-  var porMoneda = {};
-  cobros.forEach(function(c) {
-    var mon = c.moneda || 'USD';
-    if (!porMoneda[mon]) porMoneda[mon] = { total:0, cant:0 };
-    porMoneda[mon].total += parseFloat(c.monto) || 0;
-    porMoneda[mon].cant++;
-  });
-
-  // ── Render HTML ──
-  var simbFor = function(m) { return (m==='USD'||m==='U$D') ? 'U$S' : '$'; };
-  var decFor  = function(m) { return (m==='USD'||m==='U$D') ? 2 : 0; };
-
-  // Tabla por operación
-  var tblOrden = '';
-  for (var ord in porOrden) {
-    var info = porOrden[ord];
-    var s = simbFor(info.moneda);
-    var d = decFor(info.moneda);
-    var nums = info.items.map(function(i){ return i.nroPagare; }).sort(function(a,b){return a-b;});
-    tblOrden += '<tr>' +
-      '<td style="padding:6px 10px;font-family:monospace;font-weight:700">#' + ord + '</td>' +
-      '<td style="padding:6px 10px">' + esc(info.deudor) + '</td>' +
-      '<td style="padding:6px 10px">' + esc(info.acreedor) + '</td>' +
-      '<td style="padding:6px 10px;text-align:center">' + nums.join(', ') + '</td>' +
-      '<td style="padding:6px 10px;text-align:center">' + info.items.length + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;font-weight:600">' + s + ' ' + fmtN(info.total, d) + '</td>' +
-    '</tr>';
-  }
-
-  // Tabla por deudor
-  var tblDeudor = '';
-  for (var deu in porDeudor) {
-    var monedas = porDeudor[deu].monedas;
-    for (var mon in monedas) {
-      var s2 = simbFor(mon);
-      var d2 = decFor(mon);
-      tblDeudor += '<tr>' +
-        '<td style="padding:6px 10px;font-weight:600">' + esc(deu) + '</td>' +
-        '<td style="padding:6px 10px;text-align:center">' + monedas[mon].cant + '</td>' +
-        '<td style="padding:6px 10px;text-align:right;font-weight:600">' + s2 + ' ' + fmtN(monedas[mon].total, d2) + '</td>' +
-      '</tr>';
+  var filas = serie.map(function(s, i) {
+    var nro = i + 1;
+    var cobrado = CURR_COBRADOS.includes(nro);
+    var vto = s.vencimiento;
+    var vencido = !cobrado && vto < hoy;
+    var estado, estilo;
+    if (cobrado) {
+      estado = '✅ COBRADO';
+      estilo = 'color:var(--green);font-weight:600';
+      totalCobrado += s.monto;
+      cantCobrado++;
+    } else if (vencido) {
+      estado = '⚠ VENCIDO';
+      estilo = 'color:var(--red);font-weight:600';
+      totalVencido += s.monto;
+      cantVencido++;
+    } else {
+      estado = '⏳ Pendiente';
+      estilo = 'color:var(--text3)';
+      totalPendiente += s.monto;
+      cantPendiente++;
     }
-  }
-
-  // Tabla totales por moneda
-  var tblMoneda = '';
-  for (var mon2 in porMoneda) {
-    var s3 = simbFor(mon2);
-    var d3 = decFor(mon2);
-    tblMoneda += '<tr>' +
-      '<td style="padding:6px 10px;font-weight:700">' + s3 + '</td>' +
-      '<td style="padding:6px 10px;text-align:center">' + porMoneda[mon2].cant + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;font-weight:700;color:var(--green)">' + s3 + ' ' + fmtN(porMoneda[mon2].total, d3) + '</td>' +
+    return '<tr>' +
+      '<td class="mono" style="padding:6px 10px">' + nro + '</td>' +
+      '<td style="padding:6px 10px">' + fmtFecha(vto) + '</td>' +
+      '<td class="mono" style="padding:6px 10px;text-align:right">' + simb + ' ' + fmtN(s.monto, dec) + '</td>' +
+      '<td style="padding:6px 10px;' + estilo + '">' + estado + '</td>' +
     '</tr>';
-  }
+  }).join('');
 
+  var totalGeneral = roundD(serie.reduce(function(a,x){return a+x.monto},0), dec);
+  totalCobrado = roundD(totalCobrado, dec);
+  totalPendiente = roundD(totalPendiente, dec);
+  totalVencido = roundD(totalVencido, dec);
+  var pctCobrado = n > 0 ? Math.round(cantCobrado / n * 100) : 0;
+
+  var deudorParts = (lote.deudor||'').split('|||');
+  var modoLabel = {'CUOTAS_IGUALES':'Cuotas iguales','CUOTA_FIJA':'Cuota fija','FINANCIERO':'Financiero'}[lote.modo]||lote.modo;
   var fechaRpt = new Date().toLocaleString('es-AR');
 
+  // Barra de progreso
+  var barColor = pctCobrado >= 100 ? 'var(--green)' : pctCobrado >= 50 ? 'var(--amber)' : 'var(--blue)';
+
+  var campo = function(label, val) {
+    if (!val) return '';
+    return '<div style="display:flex;padding:3px 0;gap:8px">' +
+      '<span style="color:var(--text3);width:140px;flex-shrink:0;font-size:11px">' + label + '</span>' +
+      '<span style="color:var(--text);font-size:11px">' + esc(val) + '</span></div>';
+  };
+
   var html = '<div style="max-width:860px">' +
+
+    // Header
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
-      '<div><div style="font-size:18px;font-weight:700;color:var(--text)">📊 Reporte de Cobranzas</div>' +
+      '<div><div style="font-size:18px;font-weight:700;color:var(--text)">📊 Cobranzas · Operación #' + esc(lote.orden) + '</div>' +
       '<div style="font-size:11px;color:var(--text3);margin-top:3px">Generado: ' + fechaRpt + '</div></div>' +
-      '<button class="vbtn vbtn-reprint" onclick="goTab(\'vista\')">← Volver</button>' +
+      '<button class="vbtn vbtn-reprint" onclick="renderVista(CURR_LOTE,CURR_SERIE)">← Volver a pagarés</button>' +
     '</div>' +
 
-    '<div style="margin-bottom:24px">' +
-      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Totales por moneda</div>' +
-      '<div class="tbl-wrap"><table class="tbl">' +
-      '<thead><tr><th>Moneda</th><th style="text-align:center">Pagarés</th><th style="text-align:right">Total cobrado</th></tr></thead>' +
-      '<tbody>' + tblMoneda + '</tbody></table></div>' +
+    // Datos de la operación
+    '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Datos de la operación</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">' +
+        campo('Deudor', deudorParts[0]||'') +
+        campo('Acreedor', lote.acreedor||'A la orden') +
+        campo('Domicilio', deudorParts[1]||'') +
+        campo('Localidad', deudorParts[2]||'') +
+        campo('Moneda', simb) +
+        campo('Modo', modoLabel) +
+        campo('Fecha emisión', fmtISODate(lote.fechaEmision)) +
+        campo('1° Vencimiento', fmtISODate(lote.fechaVtoInic)) +
+        campo('Lugar de pago', lote.lugarPago) +
+        campo('Valor recibido', lote.valRecibido) +
+        (lote.modo==='FINANCIERO' ? campo('Sistema', lote.sistemaFin + ' · ' + lote.tasa + '% ' + lote.tipoTasa) : '') +
+      '</div>' +
     '</div>' +
 
-    '<div style="margin-bottom:24px">' +
-      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por operación</div>' +
-      '<div class="tbl-wrap"><table class="tbl">' +
-      '<thead><tr><th>Op.</th><th>Deudor</th><th>Acreedor</th><th style="text-align:center">Pagarés</th><th style="text-align:center">Cant.</th><th style="text-align:right">Total</th></tr></thead>' +
-      '<tbody>' + tblOrden + '</tbody></table></div>' +
+    // Progreso
+    '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Progreso de cobro</span>' +
+        '<span style="font-size:14px;font-weight:700;color:' + barColor + '">' + pctCobrado + '%</span>' +
+      '</div>' +
+      '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:14px">' +
+        '<div style="height:100%;width:' + pctCobrado + '%;background:' + barColor + ';border-radius:4px;transition:width .4s"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;text-align:center">' +
+        '<div style="background:var(--bg2);border-radius:8px;padding:10px">' +
+          '<div style="font-size:18px;font-weight:700;color:var(--text)">' + n + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase">Total</div>' +
+        '</div>' +
+        '<div style="background:var(--bg2);border-radius:8px;padding:10px">' +
+          '<div style="font-size:18px;font-weight:700;color:var(--green)">' + cantCobrado + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase">Cobrados</div>' +
+        '</div>' +
+        '<div style="background:var(--bg2);border-radius:8px;padding:10px">' +
+          '<div style="font-size:18px;font-weight:700;color:var(--amber)">' + cantPendiente + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase">Pendientes</div>' +
+        '</div>' +
+        '<div style="background:var(--bg2);border-radius:8px;padding:10px">' +
+          '<div style="font-size:18px;font-weight:700;color:var(--red)">' + cantVencido + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);text-transform:uppercase">Vencidos</div>' +
+        '</div>' +
+      '</div>' +
     '</div>' +
 
+    // Montos
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">' +
+      '<div style="background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:14px;text-align:center">' +
+        '<div style="font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Cobrado</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--green);font-family:var(--mono)">' + simb + ' ' + fmtN(totalCobrado, dec) + '</div>' +
+      '</div>' +
+      '<div style="background:var(--amberbg);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px;text-align:center">' +
+        '<div style="font-size:9px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Pendiente</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--amber);font-family:var(--mono)">' + simb + ' ' + fmtN(totalPendiente, dec) + '</div>' +
+      '</div>' +
+      '<div style="background:var(--redbg);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:14px;text-align:center">' +
+        '<div style="font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Vencido</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--red);font-family:var(--mono)">' + simb + ' ' + fmtN(totalVencido, dec) + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Tabla detalle
     '<div style="margin-bottom:24px">' +
-      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Por deudor</div>' +
+      '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Detalle de pagarés</div>' +
       '<div class="tbl-wrap"><table class="tbl">' +
-      '<thead><tr><th>Deudor</th><th style="text-align:center">Pagarés</th><th style="text-align:right">Total cobrado</th></tr></thead>' +
-      '<tbody>' + tblDeudor + '</tbody></table></div>' +
+      '<thead><tr><th>N°</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th>Estado</th></tr></thead>' +
+      '<tbody>' + filas + '</tbody>' +
+      '<tfoot><tr style="border-top:2px solid var(--border)">' +
+        '<td style="padding:8px 10px;font-weight:700" colspan="2">TOTAL</td>' +
+        '<td style="padding:8px 10px;text-align:right;font-weight:700;font-family:var(--mono);color:var(--text)">' + simb + ' ' + fmtN(totalGeneral, dec) + '</td>' +
+        '<td style="padding:8px 10px;font-weight:600;color:var(--green)">' + cantCobrado + '/' + n + ' cobrados</td>' +
+      '</tr></tfoot>' +
+      '</table></div>' +
     '</div>' +
 
   '</div>';
 
   document.getElementById('vista-content').innerHTML = html;
 }
-
+  
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
 // ════════════════════════════════════════════════════════
