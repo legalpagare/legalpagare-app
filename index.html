@@ -1228,7 +1228,7 @@ function goTab(tab){
     document.getElementById('tab-'+t).style.display  = t===tab?'block':'none';
     document.getElementById('nav-'+t).classList.toggle('active',t===tab);
   });
-  const titles={nueva:'Nueva operación',browser:'Mis operaciones',vista:'Vista previa / Imprimir',docs:'Documentos'};
+  const titles={nueva:'Nueva operación',browser:'Mis operaciones',vista:'Vista previa / Imprimir',docs:'Documentos',cobranzas:'Cobranzas'};
   document.getElementById('topbar-title').textContent = titles[tab];
   const tr = document.getElementById('topbar-right'); tr.innerHTML='';
   if (tab==='browser'){
@@ -1241,6 +1241,7 @@ function goTab(tab){
   }
 if (tab==='browser' && ALL_LOTES.length===0) loadLotes();
   if (tab==='docs') loadTemplates();
+  if (tab==='cobranzas') loadCobGeneral();
   if (tab==='nueva') limpiarDeudor();
 }
 function addTbtn(container,label,fn,cls=''){
@@ -2821,6 +2822,204 @@ async function reporteCobranzas() {
   '</div>';
 
   document.getElementById('vista-content').innerHTML = html;
+}
+// ════════════════════════════════════════════════════════
+//  MÓDULO COBRANZAS GENERAL
+// ════════════════════════════════════════════════════════
+let COB_DATA = null; // { lotes:[], cobranzas:[] }
+let COB_FILTRO = 'todos';
+
+async function loadCobGeneral() {
+  if (!COB_DATA) {
+    document.getElementById('cob-general-content').innerHTML =
+      '<div class="vista-empty"><div class="ve-icon">📊</div><div class="ve-title">Cargando...</div></div>';
+  }
+  const [rL, rC] = await Promise.all([
+    api({action:'getLotes',token:SESSION.token,estado:'IMPRESO'}),
+    api({action:'getCobranzas',token:SESSION.token})
+  ]);
+  if (!rL.ok || !rC.ok) { toast('Error al cargar cobranzas','err'); return; }
+  COB_DATA = { lotes: rL.lotes, cobranzas: rC.cobranzas };
+  renderCobGeneral();
+}
+
+function setCobFiltro(f, btn) {
+  COB_FILTRO = f;
+  document.querySelectorAll('#tab-cobranzas .fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCobGeneral();
+}
+
+function renderCobGeneral() {
+  if (!COB_DATA) return;
+  var lotes = COB_DATA.lotes;
+  var cobranzas = COB_DATA.cobranzas;
+  var buscar = (document.getElementById('cob-search')?.value||'').toLowerCase().trim();
+  var periodo = document.getElementById('cob-periodo')?.value||'todo';
+
+  // Filtrar por búsqueda
+  if (buscar) {
+    lotes = lotes.filter(function(l) {
+      return (l.deudor||'').split('|||')[0].toLowerCase().includes(buscar) ||
+             (l.acreedor||'').toLowerCase().includes(buscar) ||
+             (l.orden||'').includes(buscar);
+    });
+  }
+
+  // Fecha límite por período
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var desde = null;
+  if (periodo === 'mes') { desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1); }
+  else if (periodo === 'trim') { desde = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate()); }
+  else if (periodo === 'sem') { desde = new Date(hoy.getFullYear(), hoy.getMonth() - 6, hoy.getDate()); }
+  else if (periodo === 'anio') { desde = new Date(hoy.getFullYear(), 0, 1); }
+
+  // Armar data por operación
+  var resumen = [];
+  var totales = { USD: {cobrado:0, pendiente:0, vencido:0, cantCob:0, cantPend:0, cantVenc:0},
+                  ARS: {cobrado:0, pendiente:0, vencido:0, cantCob:0, cantPend:0, cantVenc:0} };
+
+  lotes.forEach(function(l) {
+    var esDolar = l.moneda==='USD' || l.moneda==='U$D';
+    var monKey = esDolar ? 'USD' : 'ARS';
+    var simb = esDolar ? 'U$S' : '$';
+    var dec = esDolar ? 2 : 0;
+    var n = parseInt(l.cantCuotas) || 1;
+    var montoTotal = parseFloat(l.montoTotal) || 0;
+    var montoCuota = montoTotal / n;
+    var vtoBase = parseISODate(l.fechaVtoInic || l.fecha);
+
+    var cobradas = cobranzas.filter(function(c) { return String(c.orden) === String(l.orden); })
+                            .map(function(c) { return parseInt(c.nroPagare); });
+
+    var opCob = 0, opPend = 0, opVenc = 0;
+    var mtoCob = 0, mtoPend = 0, mtoVenc = 0;
+
+    for (var i = 0; i < n; i++) {
+      var vto = addMonths(vtoBase, i);
+      var nro = i + 1;
+
+      // Filtro por período: solo contar pagarés cuyo vto esté en el rango
+      if (desde && vto < desde) continue;
+
+      if (cobradas.includes(nro)) {
+        opCob++; mtoCob += montoCuota;
+      } else if (vto < hoy) {
+        opVenc++; mtoVenc += montoCuota;
+      } else {
+        opPend++; mtoPend += montoCuota;
+      }
+    }
+
+    var totalOp = opCob + opPend + opVenc;
+    if (totalOp === 0) return; // fuera del período
+
+    // Filtro por estado
+    if (COB_FILTRO === 'cobrado' && opCob === 0) return;
+    if (COB_FILTRO === 'pendiente' && opPend === 0) return;
+    if (COB_FILTRO === 'vencido' && opVenc === 0) return;
+
+    totales[monKey].cobrado += mtoCob;
+    totales[monKey].pendiente += mtoPend;
+    totales[monKey].vencido += mtoVenc;
+    totales[monKey].cantCob += opCob;
+    totales[monKey].cantPend += opPend;
+    totales[monKey].cantVenc += opVenc;
+
+    resumen.push({
+      orden: l.orden, deudor: (l.deudor||'').split('|||')[0],
+      acreedor: l.acreedor||'', simb: simb, dec: dec, monKey: monKey,
+      total: totalOp, cobrado: opCob, pendiente: opPend, vencido: opVenc,
+      mtoCob: mtoCob, mtoPend: mtoPend, mtoVenc: mtoVenc,
+      montoTotal: montoCuota * totalOp
+    });
+  });
+
+  // Render
+  var simbFor = function(m) { return m==='USD' ? 'U$S' : '$'; };
+  var decFor = function(m) { return m==='USD' ? 2 : 0; };
+
+  // Cards de totales
+  var cardsHtml = '';
+  ['USD','ARS'].forEach(function(mon) {
+    var t = totales[mon];
+    var total = t.cantCob + t.cantPend + t.cantVenc;
+    if (total === 0) return;
+    var s = simbFor(mon);
+    var d = decFor(mon);
+    var pct = total > 0 ? Math.round(t.cantCob / total * 100) : 0;
+    var barCol = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--blue)';
+    cardsHtml +=
+      '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<span style="font-size:12px;font-weight:700;color:var(--text)">' + s + ' — ' + (mon==='USD'?'Dólares':'Pesos') + '</span>' +
+          '<span style="font-size:14px;font-weight:700;color:' + barCol + '">' + pct + '% cobrado</span>' +
+        '</div>' +
+        '<div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + barCol + ';border-radius:3px"></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">' +
+          '<div style="background:var(--greenbg);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-size:15px;font-weight:700;color:var(--green);font-family:var(--mono)">' + s + ' ' + fmtN(roundD(t.cobrado,d),d) + '</div>' +
+            '<div style="font-size:9px;color:var(--green);margin-top:2px">' + t.cantCob + ' cobrados</div>' +
+          '</div>' +
+          '<div style="background:var(--amberbg);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-size:15px;font-weight:700;color:var(--amber);font-family:var(--mono)">' + s + ' ' + fmtN(roundD(t.pendiente,d),d) + '</div>' +
+            '<div style="font-size:9px;color:var(--amber);margin-top:2px">' + t.cantPend + ' pendientes</div>' +
+          '</div>' +
+          '<div style="background:var(--redbg);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-size:15px;font-weight:700;color:var(--red);font-family:var(--mono)">' + s + ' ' + fmtN(roundD(t.vencido,d),d) + '</div>' +
+            '<div style="font-size:9px;color:var(--red);margin-top:2px">' + t.cantVenc + ' vencidos</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  // Tabla de operaciones
+  var tblHtml = '';
+  if (resumen.length === 0) {
+    tblHtml = '<tr><td colspan="7" class="empty-tbl">Sin operaciones para el filtro seleccionado</td></tr>';
+  } else {
+    resumen.sort(function(a,b) { return b.vencido - a.vencido || b.pendiente - a.pendiente; });
+    tblHtml = resumen.map(function(r) {
+      var pct = r.total > 0 ? Math.round(r.cobrado / r.total * 100) : 0;
+      var barW = pct + '%';
+      var barCol = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--blue)';
+      var estadoHtml = '';
+      if (r.vencido > 0) estadoHtml += '<span style="color:var(--red);font-size:10px;font-weight:600">' + r.vencido + ' venc.</span> ';
+      if (r.pendiente > 0) estadoHtml += '<span style="color:var(--amber);font-size:10px">' + r.pendiente + ' pend.</span> ';
+      if (r.cobrado > 0) estadoHtml += '<span style="color:var(--green);font-size:10px">' + r.cobrado + ' cob.</span>';
+
+      return '<tr>' +
+        '<td class="mono" style="padding:8px 10px;cursor:pointer;color:var(--blue)" onclick="openLote(\'' + esc(r.orden) + '\')">#' + esc(r.orden) + '</td>' +
+        '<td style="padding:8px 10px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(r.deudor) + '">' + esc(r.deudor) + '</td>' +
+        '<td style="padding:8px 10px;font-size:11px;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.acreedor) + '</td>' +
+        '<td style="padding:8px 10px;text-align:center;font-family:var(--mono);font-size:11px">' + r.cobrado + '/' + r.total + '</td>' +
+        '<td style="padding:8px 10px;min-width:80px">' +
+          '<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">' +
+            '<div style="height:100%;width:' + barW + ';background:' + barCol + ';border-radius:3px"></div>' +
+          '</div>' +
+        '</td>' +
+        '<td style="padding:8px 10px;white-space:nowrap">' + estadoHtml + '</td>' +
+        '<td class="mono" style="padding:8px 10px;text-align:right;font-weight:600">' + r.simb + ' ' + fmtN(roundD(r.montoTotal, r.dec), r.dec) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  var fechaRpt = new Date().toLocaleString('es-AR');
+
+  var html =
+    '<div style="margin-bottom:6px;font-size:11px;color:var(--text3);text-align:right">Actualizado: ' + fechaRpt + '</div>' +
+    cardsHtml +
+    '<div style="margin-bottom:16px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Operaciones</div>' +
+      '<div class="tbl-wrap"><table class="tbl">' +
+      '<thead><tr><th>Op.</th><th>Deudor</th><th>Acreedor</th><th style="text-align:center">Cobro</th><th>Progreso</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead>' +
+      '<tbody>' + tblHtml + '</tbody>' +
+      '</table></div>' +
+    '</div>';
+
+  document.getElementById('cob-general-content').innerHTML = html;
 }
   
 // ════════════════════════════════════════════════════════
