@@ -798,6 +798,7 @@ select.finp option{background:var(--bg2)}
             <option value="anio">Este año</option>
           </select>
           <button class="reload-btn" onclick="loadCobGeneral()">↺ Actualizar</button>
+          <button class="reload-btn" style="background:var(--bg2);color:var(--amber);border-color:rgba(245,158,11,.3)" onclick="renderAgendaCobros()">📅 Agenda de cobros</button>
         </div>
         <div id="cob-general-content">
           <div class="vista-empty"><div class="ve-icon">📊</div><div class="ve-title">Cargando cobranzas...</div></div>
@@ -3021,7 +3022,208 @@ function renderCobGeneral() {
 
   document.getElementById('cob-general-content').innerHTML = html;
 }
-  
+// ════════════════════════════════════════════════════════
+//  AGENDA DE COBROS
+// ════════════════════════════════════════════════════════
+function renderAgendaCobros() {
+  if (!COB_DATA) { toast('Cargando datos...','inf'); loadCobGeneral(); return; }
+
+  var lotes = COB_DATA.lotes;
+  var cobranzas = COB_DATA.cobranzas;
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  // Recopilar todos los pagarés pendientes con su fecha
+  var items = [];
+  lotes.forEach(function(l) {
+    var esDolar = l.moneda==='USD' || l.moneda==='U$D';
+    var simb = esDolar ? 'U$S' : '$';
+    var dec = esDolar ? 2 : 0;
+    var n = parseInt(l.cantCuotas) || 1;
+    var montoTotal = parseFloat(l.montoTotal) || 0;
+    var montoCuota = montoTotal / n;
+    var vtoBase = parseISODate(l.fechaVtoInic || l.fecha);
+    var cobradas = cobranzas.filter(function(c) { return String(c.orden) === String(l.orden); })
+                            .map(function(c) { return parseInt(c.nroPagare); });
+    var deudorParts = (l.deudor||'').split('|||');
+
+    for (var i = 0; i < n; i++) {
+      var nro = i + 1;
+      if (cobradas.includes(nro)) continue;
+      var vto = addMonths(vtoBase, i);
+      items.push({
+        vto: vto,
+        vtoStr: fmtFecha(vto),
+        vtoISO: vto.getTime(),
+        vencido: vto < hoy,
+        orden: l.orden,
+        deudor: deudorParts[0] || '',
+        domicilio: deudorParts[1] || '',
+        localidad: deudorParts[2] || '',
+        acreedor: l.acreedor || '',
+        nro: nro,
+        total: n,
+        monto: montoCuota,
+        simb: simb,
+        dec: dec,
+        moneda: esDolar ? 'USD' : 'ARS'
+      });
+    }
+  });
+
+  // Ordenar por fecha
+  items.sort(function(a, b) { return a.vtoISO - b.vtoISO; });
+
+  // Separar vencidos y futuros
+  var vencidos = items.filter(function(i) { return i.vencido; });
+  var futuros = items.filter(function(i) { return !i.vencido; });
+
+  // Agrupar futuros por fecha
+  var porFecha = {};
+  futuros.forEach(function(it) {
+    var key = it.vtoStr;
+    if (!porFecha[key]) porFecha[key] = { fecha: it.vto, items: [], totalUSD: 0, totalARS: 0 };
+    porFecha[key].items.push(it);
+    if (it.moneda === 'USD') porFecha[key].totalUSD += it.monto;
+    else porFecha[key].totalARS += it.monto;
+  });
+
+  var fechasOrden = Object.keys(porFecha).sort(function(a, b) {
+    return porFecha[a].fecha.getTime() - porFecha[b].fecha.getTime();
+  });
+
+  // Totales vencidos
+  var vencTotalUSD = 0, vencTotalARS = 0;
+  vencidos.forEach(function(v) {
+    if (v.moneda === 'USD') vencTotalUSD += v.monto;
+    else vencTotalARS += v.monto;
+  });
+
+  var fechaRpt = new Date().toLocaleString('es-AR');
+
+  // ── RENDER ──
+  var html = '<div style="max-width:860px">' +
+
+    // Header
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+      '<div><div style="font-size:18px;font-weight:700;color:var(--text)">📅 Agenda de Cobros</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:3px">Generado: ' + fechaRpt + ' · ' + items.length + ' pagarés pendientes</div></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="vbtn vbtn-reprint" onclick="imprimirAgenda()">🖨 Imprimir</button>' +
+        '<button class="vbtn vbtn-reprint" onclick="renderCobGeneral()">← Volver</button>' +
+      '</div>' +
+    '</div>';
+
+  // ── VENCIDOS ──
+  if (vencidos.length > 0) {
+    html += '<div style="background:var(--redbg);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:16px;margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<span style="font-size:12px;font-weight:700;color:var(--red)">⚠ VENCIDOS — ' + vencidos.length + ' pagaré' + (vencidos.length>1?'s':'') + ' sin cobrar</span>' +
+        '<span style="font-size:11px;color:var(--red);font-family:var(--mono)">' +
+          (vencTotalUSD > 0 ? 'U$S ' + fmtN(roundD(vencTotalUSD,2),2) : '') +
+          (vencTotalUSD > 0 && vencTotalARS > 0 ? ' · ' : '') +
+          (vencTotalARS > 0 ? '$ ' + fmtN(roundD(vencTotalARS,0),0) : '') +
+        '</span>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+      '<thead><tr style="border-bottom:1px solid rgba(239,68,68,.2)">' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--red);font-size:9px;font-weight:600">VENCIMIENTO</th>' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--red);font-size:9px;font-weight:600">DEUDOR</th>' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--red);font-size:9px;font-weight:600">DOMICILIO</th>' +
+        '<th style="padding:5px 8px;text-align:center;color:var(--red);font-size:9px;font-weight:600">N°</th>' +
+        '<th style="padding:5px 8px;text-align:right;color:var(--red);font-size:9px;font-weight:600">MONTO</th>' +
+      '</tr></thead><tbody>';
+
+    vencidos.forEach(function(v) {
+      var diasAtraso = Math.ceil((hoy.getTime() - v.vto.getTime()) / (1000*60*60*24));
+      html += '<tr style="border-bottom:1px solid rgba(239,68,68,.1)">' +
+        '<td style="padding:5px 8px;color:var(--red);font-weight:600">' + v.vtoStr + ' <span style="font-size:9px;opacity:.7">(' + diasAtraso + 'd)</span></td>' +
+        '<td style="padding:5px 8px;color:var(--text);font-weight:500">' + esc(v.deudor) + '</td>' +
+        '<td style="padding:5px 8px;color:var(--text3);font-size:10px">' + esc(v.domicilio) + (v.localidad ? ', ' + esc(v.localidad) : '') + '</td>' +
+        '<td style="padding:5px 8px;text-align:center;font-family:var(--mono);color:var(--text3)">' + v.nro + '/' + v.total + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--red);font-weight:600">' + v.simb + ' ' + fmtN(roundD(v.monto,v.dec),v.dec) + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // ── PRÓXIMOS COBROS POR FECHA ──
+  if (fechasOrden.length > 0) {
+    html += '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Próximos cobros</div>';
+
+    fechasOrden.forEach(function(fechaKey) {
+      var grupo = porFecha[fechaKey];
+      var diasHasta = Math.ceil((grupo.fecha.getTime() - hoy.getTime()) / (1000*60*60*24));
+      var urgencia = '';
+      var borderColor = 'var(--border)';
+      if (diasHasta <= 7) { urgencia = ' · ⚡ esta semana'; borderColor = 'rgba(245,158,11,.3)'; }
+      else if (diasHasta <= 30) { urgencia = ' · 📅 este mes'; }
+
+      var totalLinea = '';
+      if (grupo.totalUSD > 0) totalLinea += 'U$S ' + fmtN(roundD(grupo.totalUSD,2),2);
+      if (grupo.totalUSD > 0 && grupo.totalARS > 0) totalLinea += ' · ';
+      if (grupo.totalARS > 0) totalLinea += '$ ' + fmtN(roundD(grupo.totalARS,0),0);
+
+      var diaNombre = getDia(grupo.fecha.getDay());
+      diaNombre = diaNombre.charAt(0).toUpperCase() + diaNombre.slice(1);
+
+      html += '<div style="background:var(--bg1);border:1px solid ' + borderColor + ';border-radius:10px;margin-bottom:8px;overflow:hidden">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<span style="font-size:13px;font-weight:700;color:var(--text)">' + diaNombre + ' ' + fechaKey + '</span>' +
+            '<span style="font-size:10px;color:var(--text3)">' + diasHasta + ' día' + (diasHasta!==1?'s':'') + urgencia + '</span>' +
+          '</div>' +
+          '<span style="font-size:11px;font-family:var(--mono);color:var(--text2);font-weight:600">' + totalLinea + ' · ' + grupo.items.length + ' pag.</span>' +
+        '</div>';
+
+      grupo.items.forEach(function(it) {
+        html += '<div style="display:flex;align-items:center;padding:7px 14px;border-bottom:1px solid rgba(42,51,71,.3);gap:10px;font-size:11px">' +
+          '<span style="color:var(--blue);font-family:var(--mono);font-size:10px;min-width:40px;cursor:pointer" onclick="openLote(\'' + esc(it.orden) + '\')">#' + esc(it.orden) + '</span>' +
+          '<span style="font-weight:600;color:var(--text);min-width:140px">' + esc(it.deudor) + '</span>' +
+          '<span style="color:var(--text3);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.domicilio) + (it.localidad ? ', ' + esc(it.localidad) : '') + '</span>' +
+          '<span style="font-family:var(--mono);color:var(--text3);font-size:10px">' + it.nro + '/' + it.total + '</span>' +
+          '<span style="font-family:var(--mono);font-weight:600;color:var(--text);min-width:90px;text-align:right">' + it.simb + ' ' + fmtN(roundD(it.monto,it.dec),it.dec) + '</span>' +
+        '</div>';
+      });
+
+      html += '</div>';
+    });
+  }
+
+  if (items.length === 0) {
+    html += '<div class="vista-empty"><div class="ve-icon">✅</div><div class="ve-title">¡Todo cobrado!</div><div class="ve-sub">No hay pagarés pendientes de cobro.</div></div>';
+  }
+
+  html += '</div>';
+  document.getElementById('cob-general-content').innerHTML = html;
+}
+
+function imprimirAgenda() {
+  var content = document.getElementById('cob-general-content').innerHTML;
+  var printWin = window.open('','_blank','width=900,height=700');
+  printWin.document.write(
+    '<html><head><title>Agenda de Cobros · LegalPagaré</title>' +
+    '<style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:16px;margin:0}' +
+    'table{width:100%;border-collapse:collapse}th,td{padding:5px 8px;text-align:left}' +
+    'th{font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #ccc}' +
+    'td{border-bottom:1px solid #eee;font-size:11px}' +
+    '.mono{font-family:monospace}' +
+    '@media print{body{padding:10mm}}</style></head><body>' +
+    '<h2 style="margin:0 0 4px;font-size:16px">📅 Agenda de Cobros</h2>' +
+    '<p style="margin:0 0 16px;font-size:11px;color:#888">Impreso: ' + new Date().toLocaleString('es-AR') + ' · LegalPagaré</p>' +
+    content.replace(/var\(--text\)/g,'#222').replace(/var\(--text2\)/g,'#555')
+           .replace(/var\(--text3\)/g,'#888').replace(/var\(--green\)/g,'#16a34a')
+           .replace(/var\(--greend\)/g,'#16a34a').replace(/var\(--red\)/g,'#dc2626')
+           .replace(/var\(--amber\)/g,'#d97706').replace(/var\(--blue\)/g,'#2563eb')
+           .replace(/var\(--bg[0-3]\)/g,'#fff').replace(/var\(--bg1\)/g,'#fff')
+           .replace(/var\(--bg2\)/g,'#f8f8f8').replace(/var\(--border[2]?\)/g,'#ddd')
+           .replace(/var\(--greenbg\)/g,'#f0fdf4').replace(/var\(--redbg\)/g,'#fef2f2')
+           .replace(/var\(--amberbg\)/g,'#fffbeb').replace(/var\(--bluebg\)/g,'#eff6ff')
+           .replace(/var\(--mono\)/g,'monospace').replace(/var\(--font\)/g,'Arial,sans-serif') +
+    '</body></html>'
+  );
+  printWin.document.close();
+  setTimeout(function() { printWin.print(); }, 500);
+}
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
 // ════════════════════════════════════════════════════════
