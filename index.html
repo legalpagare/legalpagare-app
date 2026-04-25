@@ -501,6 +501,18 @@ select.finp option{background:var(--bg2)}
         <button class="nav-btn" id="nav-docs" onclick="goTab('docs')"><span class="nav-icon">📄</span>Documentos</button>
         <button class="nav-btn" id="nav-cobranzas" onclick="goTab('cobranzas')"><span class="nav-icon">📊</span>Cobranzas</button>
       </div>
+      <!-- Equipo de trabajo -->
+      <div id="sidebar-equipo" style="display:none;padding:8px 10px">
+        <div class="nav-lbl">Equipo</div>
+        <div id="sidebar-colabs-lista" style="padding:0 4px"></div>
+        <button id="btn-gestionar-equipo" style="display:none;width:100%;margin-top:6px;padding:6px 10px;border-radius:7px;border:1px solid rgba(59,130,246,.3);background:var(--bluebg);color:var(--blue);font-size:10px;font-weight:600;cursor:pointer" onclick="abrirGestionColabs()">⚙ Gestionar equipo</button>
+      </div>
+      <!-- Selector espacio activo -->
+      <div id="sidebar-espacio" style="display:none;padding:6px 10px">
+        <button onclick="cambiarEspacio()" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:10px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s">
+          🏢 <span id="espacio-activo-lbl">Cuenta propia</span> <span style="margin-left:auto;color:var(--text3)">▾</span>
+        </button>
+      </div>
     </div>
     <div class="sb-footer">
       <button class="logout-btn" onclick="logout()">⏻&nbsp;&nbsp;Cerrar sesión</button>
@@ -958,6 +970,31 @@ select.finp option{background:var(--bg2)}
     </div>
   </div>
 </div>
+<!-- Modal selector de espacio de trabajo -->
+<div class="overlay" id="espacio-overlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-icon">🏢</div>
+    <div class="modal-title">Espacio de trabajo</div>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:14px">Seleccioná el espacio en el que querés operar</div>
+    <div id="espacio-lista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>
+  </div>
+</div>
+<!-- Modal gestión de colaboradores -->
+<div class="overlay" id="colabs-overlay">
+  <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto">
+    <div class="modal-icon">👥</div>
+    <div class="modal-title">Equipo de trabajo</div>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:14px">Las personas autorizadas pueden operar sobre tu cuenta</div>
+    <div id="colabs-lista" style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input class="finp" id="colab-email-inp" type="email" placeholder="correo del colaborador" style="flex:1"/>
+      <button class="fab fab-green" style="padding:8px 14px;white-space:nowrap" onclick="agregarColaborador()">+ Agregar</button>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" style="flex:1" onclick="document.getElementById('colabs-overlay').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
 <!-- Modal registrar cobro -->
 <div class="overlay" id="cobro-overlay">
   <div class="modal" style="max-width:520px">
@@ -1023,6 +1060,7 @@ let SISTEMA    = 'FRANCES';
 let TIPO_TASA  = 'TNA';
 let PE_ACTIVE  = false;       // Privacidad Extrema — OFF por defecto
 let IS_PRO     = false;       // Plan PRO
+let ESPACIO    = null;        // Email del titular (null = cuenta propia)
 
 // ════════════════════════════════════════════════════════
 //  INIT
@@ -1099,15 +1137,39 @@ function clearOTP(){ document.querySelectorAll('.otp-inp').forEach(i=>{i.value='
 //  SCREENS
 // ════════════════════════════════════════════════════════
 function showLogin(){ document.getElementById('screen-login').style.display='flex'; document.getElementById('screen-app').classList.remove('visible'); }
-function showApp(){
+async function showApp(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').classList.add('visible');
+
+  // Verificar espacios de trabajo (colaboradores)
+  const re = await api({action:'getEspacios',token:SESSION.token});
+  if (re.ok && re.espacios && re.espacios.length > 1) {
+    // Restaurar espacio guardado si existe
+    const savedEsp = localStorage.getItem('pg_espacio');
+    if (savedEsp && re.espacios.some(e => e.email === savedEsp)) {
+      ESPACIO = savedEsp;
+      // Recargar datos del titular
+      const ru = await api({action:'getUser',token:SESSION.token});
+      if (ru.ok) SESSION.user = ru.user;
+    } else {
+      // Mostrar selector
+      mostrarSelectorEspacio(re.espacios);
+      return;
+    }
+  } else {
+    ESPACIO = null;
+    localStorage.removeItem('pg_espacio');
+  }
+
+  finalizarShowApp();
+}
+
+function finalizarShowApp() {
   renderUser(); loadStats(); goTab('browser');
-  cargarTDocumentos();
+  cargarTDocumentos(); cargarColaboradoresSidebar();
   setTimeout(()=>{
     const l=document.getElementById('fin-lock');
     if(l) l.style.display=IS_PRO?'none':'inline';
-    // Mostrar botón ABM solo para admin
     const btnAbm=document.getElementById('btn-abm-usuarios');
     if(btnAbm) btnAbm.style.display=SESSION?.user?.esAdmin?'inline-flex':'none';
   },150);
@@ -1142,7 +1204,8 @@ async function verifyCode(){
   showApp();
 }
 function logout(){
-  SESSION=null; localStorage.removeItem('pg_sess');
+  SESSION=null; ESPACIO=null; COB_DATA=null;
+  localStorage.removeItem('pg_sess'); localStorage.removeItem('pg_espacio');
   ALL_LOTES=[]; CURR_LOTE=null; CURR_SERIE=[]; FILTER='TODOS';
   showLogin();
   document.getElementById('ls1').style.display='block'; document.getElementById('ls2').style.display='none';
@@ -1157,8 +1220,14 @@ function renderUser(){
   if (!SESSION) return;
   const u = SESSION.user;
   IS_PRO = u.esPro || u.esAdmin || false;
-  document.getElementById('uc-name').textContent  = u.nombre||u.email;
-  document.getElementById('uc-email').textContent = u.email;
+  // Si opera como colaborador, mostrar datos del titular
+  if (ESPACIO) {
+    document.getElementById('uc-name').textContent = u.nombre||u.email;
+    document.getElementById('uc-email').innerHTML = '<span style="color:var(--blue);font-size:9px">▸ ' + esc(ESPACIO.split('@')[0]) + '</span>';
+  } else {
+    document.getElementById('uc-name').textContent = u.nombre||u.email;
+    document.getElementById('uc-email').textContent = u.email;
+  }
   const b = document.getElementById('uc-badge');
   if (u.esAdmin) { b.textContent='ADMIN'; b.className='uc-badge admin'; }
   else if (IS_PRO) { b.textContent='PRO'; b.className='uc-badge pro'; }
@@ -2109,7 +2178,10 @@ async function generarReportePDF(){
 // ════════════════════════════════════════════════════════
 async function api(params){
   try {
-    // Usar POST para sendPrivEmail (payload grande)
+    // OPT: inyectar espacio de trabajo en todas las llamadas autenticadas
+    if (ESPACIO && params.token && !params.espacio) {
+      params.espacio = ESPACIO;
+    }
     // Usar POST para payloads grandes
     if (params.action === 'sendPrivEmail' || params.action === 'saveTemplate' || params.action === 'generarDocumento') {
       const res = await fetch(API_URL, {
@@ -3224,6 +3296,149 @@ function imprimirAgenda() {
   printWin.document.close();
   setTimeout(function() { printWin.print(); }, 500);
 }
+// ════════════════════════════════════════════════════════
+//  ESPACIOS DE TRABAJO / COLABORADORES
+// ════════════════════════════════════════════════════════
+function mostrarSelectorEspacio(espacios) {
+  var lista = document.getElementById('espacio-lista');
+  lista.innerHTML = espacios.map(function(e) {
+    var badge = e.propio
+      ? '<span style="font-size:9px;background:var(--greenbg);color:var(--green);padding:2px 7px;border-radius:8px">Tu cuenta</span>'
+      : '<span style="font-size:9px;background:var(--bluebg);color:var(--blue);padding:2px 7px;border-radius:8px">Colaborador</span>';
+    return '<button onclick="seleccionarEspacio(\'' + esc(e.email) + '\',' + e.propio + ')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;text-align:left" onmouseover="this.style.borderColor=\'var(--greend)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+      '<div><div style="font-weight:600">' + esc(e.nombre) + '</div>' +
+      '<div style="font-size:10px;color:var(--text3)">' + esc(e.email) + '</div></div>' +
+      badge +
+    '</button>';
+  }).join('');
+  document.getElementById('espacio-overlay').classList.add('show');
+}
+
+async function seleccionarEspacio(email, esPropio) {
+  document.getElementById('espacio-overlay').classList.remove('show');
+  if (esPropio) {
+    ESPACIO = null;
+    localStorage.removeItem('pg_espacio');
+  } else {
+    ESPACIO = email;
+    localStorage.setItem('pg_espacio', email);
+    // Recargar datos del titular
+    showLoading('Cargando espacio...');
+    var r = await api({action:'getUser',token:SESSION.token});
+    hideLoading();
+    if (r.ok) SESSION.user = r.user;
+  }
+  ALL_LOTES = []; COB_DATA = null;
+  finalizarShowApp();
+}
+
+async function cambiarEspacio() {
+  var r = await api({action:'getEspacios',token:SESSION.token});
+  if (!r.ok || !r.espacios || r.espacios.length <= 1) {
+    toast('No tenés otros espacios de trabajo','inf'); return;
+  }
+  mostrarSelectorEspacio(r.espacios);
+}
+
+async function cargarColaboradoresSidebar() {
+  var panel = document.getElementById('sidebar-equipo');
+  var lista = document.getElementById('sidebar-colabs-lista');
+  var btnGestionar = document.getElementById('btn-gestionar-equipo');
+  var selectorDiv = document.getElementById('sidebar-espacio');
+  var espacioLbl = document.getElementById('espacio-activo-lbl');
+
+  // Mostrar espacio activo si es colaborador
+  if (ESPACIO) {
+    selectorDiv.style.display = 'block';
+    espacioLbl.textContent = SESSION.user.nombre || ESPACIO;
+  } else {
+    selectorDiv.style.display = 'none';
+    // Verificar si tiene espacios múltiples para mostrar selector
+    var re = await api({action:'getEspacios',token:SESSION.token});
+    if (re.ok && re.espacios && re.espacios.length > 1) {
+      selectorDiv.style.display = 'block';
+      espacioLbl.textContent = 'Cuenta propia';
+    }
+  }
+
+  // Cargar colaboradores (solo si es titular operando su propia cuenta)
+  var esTitular = !ESPACIO || ESPACIO === (SESSION.realEmail || SESSION.user.email);
+  var rc = await api({action:'getColaboradores',token:SESSION.token});
+  if (!rc.ok || !rc.colaboradores || rc.colaboradores.length === 0) {
+    // Sin colaboradores: mostrar botón gestionar solo si es titular
+    if (esTitular) {
+      panel.style.display = 'block';
+      lista.innerHTML = '<div style="font-size:10px;color:var(--text3);padding:4px">Sin colaboradores</div>';
+      btnGestionar.style.display = 'block';
+    } else {
+      panel.style.display = 'none';
+    }
+    return;
+  }
+
+  panel.style.display = 'block';
+  lista.innerHTML = rc.colaboradores.filter(function(c){return c.activo;}).map(function(c) {
+    return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10px">' +
+      '<span style="color:var(--green)">●</span>' +
+      '<span style="color:var(--text2)">' + esc(c.email.split('@')[0]) + '</span>' +
+    '</div>';
+  }).join('');
+
+  btnGestionar.style.display = esTitular ? 'block' : 'none';
+}
+
+async function abrirGestionColabs() {
+  showLoading('Cargando...');
+  var r = await api({action:'getColaboradores',token:SESSION.token});
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+
+  var lista = document.getElementById('colabs-lista');
+  if (!r.colaboradores.length) {
+    lista.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">No hay colaboradores asignados</div>';
+  } else {
+    lista.innerHTML = r.colaboradores.map(function(c) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px">' +
+        '<div>' +
+          '<div style="font-size:11px;font-weight:600;color:var(--text)">' + esc(c.email) + '</div>' +
+          '<div style="font-size:9px;color:var(--text3)">Desde ' + esc(c.fechaAlta) + '</div>' +
+        '</div>' +
+        '<button onclick="quitarColaborador(\'' + esc(c.email) + '\')" style="padding:4px 10px;border-radius:5px;border:1px solid rgba(239,68,68,.3);background:var(--redbg);color:var(--red);font-size:10px;font-weight:600;cursor:pointer">✕ Quitar</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  document.getElementById('colab-email-inp').value = '';
+  document.getElementById('colabs-overlay').classList.add('show');
+}
+
+async function agregarColaborador() {
+  var email = document.getElementById('colab-email-inp').value.trim();
+  if (!email) { toast('Ingresá el correo del colaborador','err'); return; }
+  showLoading('Agregando...');
+  var r = await api({action:'addColaborador',token:SESSION.token,emailColab:email});
+  hideLoading();
+  if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+  toast('✓ ' + r.mensaje,'ok');
+  document.getElementById('colab-email-inp').value = '';
+  abrirGestionColabs();
+  cargarColaboradoresSidebar();
+}
+
+async function quitarColaborador(email) {
+  showModal('✕','¿Quitar colaborador?','Se removerá el acceso de ' + email + ' a tu espacio de trabajo.',
+    async () => {
+      closeModal();
+      showLoading('Removiendo...');
+      var r = await api({action:'removeColaborador',token:SESSION.token,emailColab:email});
+      hideLoading();
+      if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+      toast('✓ ' + r.mensaje,'ok');
+      abrirGestionColabs();
+      cargarColaboradoresSidebar();
+    });
+}
+
 // ════════════════════════════════════════════════════════
 //  PRIVACIDAD EXTREMA
 // ════════════════════════════════════════════════════════
