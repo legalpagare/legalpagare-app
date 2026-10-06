@@ -152,6 +152,12 @@ a{color:var(--green);text-decoration:none}
 .finp:focus{border-color:var(--greend);background:var(--bg3)}
 .finp::placeholder{color:var(--text3);font-size:11px}
 select.finp option{background:var(--bg2)}
+.fecha-wrap{position:relative;display:flex;gap:5px;align-items:stretch}
+.fecha-wrap .fecha-txt{flex:1;min-width:0}
+.fecha-txt.bad{border-color:var(--red)!important;background:var(--redbg)!important}
+.fecha-btn{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:0 9px;color:var(--text);font-size:13px;cursor:pointer;line-height:1}
+.fecha-btn:hover{border-color:var(--greend)}
+.fecha-pick{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
 .finp-hint{font-size:10px;color:var(--gold);font-family:var(--mono);margin-top:2px;min-height:14px}
 
 /* Sistema financiero tabs */
@@ -619,11 +625,19 @@ select.finp option{background:var(--bg2)}
             </div>
             <div class="fg">
               <label class="flbl">Fecha de firma <span class="req">*</span></label>
-              <input class="finp" id="f-fechaEmis" type="date"/>
+              <div class="fecha-wrap">
+                <input class="finp fecha-txt" id="f-fechaEmis-txt" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" oninput="fechaTxtInput('f-fechaEmis',event)" onblur="fechaTxtBlur('f-fechaEmis')"/>
+                <button type="button" class="fecha-btn" title="Abrir calendario" onclick="fechaAbrirCal('f-fechaEmis')">&#128197;</button>
+                <input class="fecha-pick" id="f-fechaEmis" type="date" tabindex="-1" aria-hidden="true" oninput="fechaPickChange('f-fechaEmis')"/>
+              </div>
             </div>
             <div class="fg">
               <label class="flbl">1° Vencimiento <span class="req">*</span></label>
-              <input class="finp" id="f-vtoIni" type="date" oninput="recalcularDebounced()"/>
+              <div class="fecha-wrap">
+                <input class="finp fecha-txt" id="f-vtoIni-txt" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" oninput="fechaTxtInput('f-vtoIni',event);recalcularDebounced()" onblur="fechaTxtBlur('f-vtoIni');recalcularDebounced()"/>
+                <button type="button" class="fecha-btn" title="Abrir calendario" onclick="fechaAbrirCal('f-vtoIni')">&#128197;</button>
+                <input class="fecha-pick" id="f-vtoIni" type="date" tabindex="-1" aria-hidden="true" oninput="fechaPickChange('f-vtoIni');recalcularDebounced()"/>
+              </div>
             </div>
             <div class="fg">
               <label class="flbl">Lugar de emisión</label>
@@ -896,7 +910,11 @@ select.finp option{background:var(--bg2)}
           </div>
           <div class="abm-fg">
             <label class="abm-lbl">Vencimiento</label>
-            <input class="abm-inp" id="abm-venc" type="date"/>
+            <div class="fecha-wrap">
+              <input class="abm-inp fecha-txt" id="abm-venc-txt" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" oninput="fechaTxtInput('abm-venc',event)" onblur="fechaTxtBlur('abm-venc')"/>
+              <button type="button" class="fecha-btn" title="Abrir calendario" onclick="fechaAbrirCal('abm-venc')">&#128197;</button>
+              <input class="fecha-pick" id="abm-venc" type="date" tabindex="-1" aria-hidden="true" oninput="fechaPickChange('abm-venc')"/>
+            </div>
           </div>
           <div class="abm-fg" style="justify-content:flex-end;gap:8px">
             <div class="abm-chk-row"><input type="checkbox" id="abm-pro"/><label for="abm-pro">Plan PRO</label></div>
@@ -1100,10 +1118,10 @@ async function initSession() {
 }
 
 function setDefaultDates() {
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('f-fechaEmis').value = today;
+  // FIX: fecha local (toISOString usa UTC y despues de las 21 hs daba el dia siguiente)
+  fechaSet('f-fechaEmis', fechaISO(new Date()));
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+1);
-  document.getElementById('f-vtoIni').value = d.toISOString().slice(0,10);
+  fechaSet('f-vtoIni', fechaISO(d));
 }
 
 // ════════════════════════════════════════════════════════
@@ -1614,7 +1632,8 @@ function readForm(){
   if (!deudorNombre){ toast('El nombre del deudor es obligatorio','err'); return null; }
   const deudor = deudorNombre+'|||'+g('f-deudor-dom')+'|||'+g('f-deudor-loc');
   const vto = g('f-vtoIni');
-  if (!vto){ toast('Ingresá la fecha del 1° vencimiento','err'); return null; }
+  if (!vto){ toast('Ingresá la fecha del 1° vencimiento (dd/mm/aaaa)','err'); return null; }
+  if (!g('f-fechaEmis')){ toast('Ingresá la fecha de firma (dd/mm/aaaa)','err'); return null; }
 
   const base = {
     deudor, acreedor:g('f-acreedor'), fechaVtoInic:vto, moneda:g('f-moneda'),
@@ -2276,6 +2295,82 @@ function addMonths(d,n){
 }
 function fmtFecha(d){ return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear(); }
 function fmtISODate(s){ if(!s)return'-'; return fmtFecha(parseISODate(s)); }
+
+// ════════════════════════════════════════════════════════
+//  CAMPOS DE FECHA dd/mm/aaaa
+//  El input type="date" (id original) queda oculto: guarda el valor
+//  en aaaa-mm-dd y abre el calendario. El visible es <id>-txt.
+// ════════════════════════════════════════════════════════
+function fechaISO(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+
+// "06/10/2026" -> "2026-10-06"; '' si esta incompleta o no existe
+function fechaTxtAISO(txt){
+  const m=String(txt||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return '';
+  const d=+m[1], mes=+m[2], a=+m[3];
+  const f=new Date(a,mes-1,d);
+  if(a<1900||a>2100||f.getFullYear()!==a||f.getMonth()!==mes-1||f.getDate()!==d) return '';
+  return m[3]+'-'+m[2]+'-'+m[1];
+}
+
+// Deja solo numeros y pone las barras: "06102026" -> "06/10/2026"
+function fechaMascara(raw, borrando){
+  const partes=String(raw||'').split(/[\/\-.]/);
+  let dig='';
+  partes.forEach((p,i)=>{
+    p=p.replace(/\D/g,'');
+    // "6/10" -> "06/10": completa dia y mes si el usuario tipeo la barra
+    if(i<2 && i<partes.length-1 && p.length===1) p='0'+p;
+    dig+=p;
+  });
+  dig=dig.slice(0,8);
+  let out=dig.slice(0,2);
+  if(dig.length>2) out+='/'+dig.slice(2,4);
+  if(dig.length>4) out+='/'+dig.slice(4,8);
+  if(!borrando && (dig.length===2||dig.length===4)) out+='/';
+  return out;
+}
+
+function fechaSet(id, iso){
+  const pick=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  pick.value = m ? m[0] : '';
+  txt.value  = m ? m[3]+'/'+m[2]+'/'+m[1] : '';
+  txt.classList.remove('bad');
+}
+
+function fechaTxtInput(id, ev){
+  const pick=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  const borrando=!!(ev && ev.inputType && ev.inputType.indexOf('delete')===0);
+  txt.value=fechaMascara(txt.value, borrando);
+  const iso=fechaTxtAISO(txt.value);
+  pick.value=iso;
+  txt.classList.toggle('bad', txt.value.length===10 && !iso);
+}
+
+function fechaTxtBlur(id){
+  const pick=document.getElementById(id), txt=document.getElementById(id+'-txt');
+  // "06/10/26" -> "06/10/2026"
+  const m=txt.value.match(/^(\d{2}\/\d{2}\/)(\d{2})$/);
+  if(m) txt.value=m[1]+'20'+m[2];
+  const iso=fechaTxtAISO(txt.value);
+  pick.value=iso;
+  txt.classList.toggle('bad', !!txt.value && !iso);
+}
+
+function fechaPickChange(id){
+  fechaSet(id, document.getElementById(id).value);
+}
+
+function fechaAbrirCal(id){
+  try { document.getElementById(id).showPicker(); }
+  catch(e){ document.getElementById(id+'-txt').focus(); }
+}
+
+// true si hay algo escrito que no es una fecha valida
+function fechaInvalida(id){
+  return !!document.getElementById(id+'-txt').value && !document.getElementById(id).value;
+}
 function fmtN(n,dec){ const p=parseFloat(n).toFixed(dec).split('.'); return parseInt(p[0]).toLocaleString('es-AR')+(dec>0?','+p[1]:''); }
 function pad2(n){ return String(n).padStart(2,'0'); }
 function getDia(n){ return ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][n]; }
@@ -2385,7 +2480,7 @@ function abrirFormNuevo() {
   document.getElementById('abm-email').value = '';
   document.getElementById('abm-nombre').value= '';
   document.getElementById('abm-cupo').value  = '5';
-  document.getElementById('abm-venc').value  = '';
+  fechaSet('abm-venc', '');
   document.getElementById('abm-pro').checked    = false;
   document.getElementById('abm-admin').checked  = false;
   document.getElementById('abm-activo').checked = true;
@@ -2402,7 +2497,7 @@ function abrirFormEditar(fila) {
   document.getElementById('abm-email').value  = u.email;
   document.getElementById('abm-nombre').value = u.nombre;
   document.getElementById('abm-cupo').value   = u.cupo;
-  document.getElementById('abm-venc').value   = u.vencimiento||'';
+  fechaSet('abm-venc', u.vencimiento||'');
   document.getElementById('abm-pro').checked    = u.esPro;
   document.getElementById('abm-admin').checked  = u.esAdmin;
   document.getElementById('abm-activo').checked = u.activo;
@@ -2426,6 +2521,7 @@ async function guardarUsuario() {
   const activo = document.getElementById('abm-activo').checked;
 
   if (!email || !nombre) { toast('Email y nombre son obligatorios','err'); return; }
+  if (fechaInvalida('abm-venc')) { toast('La fecha de vencimiento no es válida (dd/mm/aaaa)','err'); return; }
 
   showLoading('Guardando...');
   const r = await api({
