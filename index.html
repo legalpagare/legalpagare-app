@@ -230,6 +230,7 @@ select.finp option{background:var(--bg2)}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;font-family:var(--mono);white-space:nowrap}
 .badge-pend{background:var(--goldbg);color:var(--gold);border:1px solid rgba(228,170,34,.25)}
 .badge-imp{background:var(--greenbg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.badge-firm{background:rgba(96,165,250,.12);color:var(--blue);border:1px solid rgba(96,165,250,.25)}
 .badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
 .modo-chip{font-size:9px;padding:2px 6px;border-radius:4px;font-family:var(--mono);font-weight:600}
 .mc-ci{background:var(--bluebg);color:var(--blue)}
@@ -254,6 +255,7 @@ select.finp option{background:var(--bg2)}
 .vbtn-pdf:hover{border-color:var(--border2);color:var(--text)}
 .vbtn-reprint{background:var(--bg2);color:var(--text2);border:1px solid var(--border)}
 .vbtn-reprint:hover{border-color:var(--border2);color:var(--text)}
+.imp-notice.firm-notice{background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.25);color:var(--blue)}
 .imp-notice{display:inline-flex;align-items:center;gap:5px;background:var(--greenbg);border:1px solid rgba(34,197,94,.2);border-radius:7px;padding:6px 12px;font-size:11px;color:var(--green);font-weight:500}
 
 /* Pagaré */
@@ -1693,6 +1695,8 @@ function renderTable(lotes){
     const dec=esDolar?2:0;
     const badge=l.estado==='PENDIENTE'
       ?'<span class="badge badge-pend"><span class="badge-dot"></span>PENDIENTE</span>'
+      :l.fechaFirma
+      ?'<span class="badge badge-firm" title="Firmado el '+esc(l.fechaFirma)+'"><span class="badge-dot"></span>FIRMADO</span>'
       :'<span class="badge badge-imp"><span class="badge-dot"></span>IMPRESO</span>';
     const mChip={'CUOTAS_IGUALES':'<span class="modo-chip mc-ci">Cuotas =</span>','CUOTA_FIJA':'<span class="modo-chip mc-cf">Cuota $</span>','FINANCIERO':'<span class="modo-chip mc-fin">Financiero</span>'}[l.modo]||'';
     const emailCol=isAdmin?`<td style="display:table-cell">${esc(l.email.split('@')[0])}</td>`:'';
@@ -1710,7 +1714,7 @@ function renderTable(lotes){
       
         <button class="tact" onclick="openLote('${l.orden}')">Ver / Imprimir</button>
         <button class="tact" style="padding:5px 7px" title="Detalle de la operación" onclick="verDetalle('${l.orden}',event)">📋</button>
-        ${l.estado!=='IMPRESO'?'':''}
+        ${l.estado==='IMPRESO'&&!l.fechaFirma?`<button class="tact" title="Marcar como firmado (no se puede deshacer)" onclick="marcarFirmado('${l.orden}',event)">&#9997; Firmado</button>`:''}
         <button class="tact" style="color:var(--text3);border-color:transparent" title="Ocultar de la lista" onclick="ocultarOp('${l.orden}',event)">✕</button>
       </td>
     </tr>`;
@@ -1745,6 +1749,27 @@ async function ocultarOp(orden, evt) {
       ALL_LOTES = ALL_LOTES.filter(l => l.orden !== orden);
       renderTable(ALL_LOTES);
       toast('Operación #'+orden+' ocultada','inf');
+    });
+}
+
+// Marca una operación impresa como firmada. No se puede desmarcar desde la app.
+async function marcarFirmado(orden, evt) {
+  if (evt) evt.stopPropagation();
+  showModal('✍', '¿Marcar como firmada?',
+    'La operación #' + orden + ' quedará como FIRMADA con la fecha de hoy.\nNo se puede deshacer.',
+    async () => {
+      closeModal();
+      showLoading('Marcando como firmada...');
+      const r = await api({ action:'markSigned', token:SESSION.token, orden });
+      hideLoading();
+      if (!r.ok) { toast('Error: '+r.error,'err'); return; }
+      const l = ALL_LOTES.find(x => String(x.orden) === String(orden));
+      if (l) { l.fechaFirma = r.fechaFirma; renderTable(ALL_LOTES); }
+      if (CURR_LOTE && String(CURR_LOTE.orden) === String(orden) && CURR_SERIE.length) {
+        CURR_LOTE.fechaFirma = r.fechaFirma;
+        renderVista(CURR_LOTE, CURR_SERIE);
+      }
+      toast('✓ Operación #'+orden+' marcada como firmada','ok');
     });
 }
 
@@ -1791,6 +1816,12 @@ function renderVista(lote, serie){
   const impNotice = !isPend && isSaved
     ? `<span class="imp-notice">✓ Impreso el ${esc(lote.fechaImpresion)}${lote.hash?' &nbsp;·&nbsp; 🔐 '+lote.hash.slice(0,12)+'...':''}</span>` : '';
 
+  const firmaNotice = !isPend && isSaved
+    ? (lote.fechaFirma
+        ? `<span class="imp-notice firm-notice">&#9997; Firmado el ${esc(lote.fechaFirma)}</span>`
+        : `<button class="vbtn vbtn-reprint" title="No se puede deshacer" onclick="marcarFirmado('${esc(lote.orden)}')">&#9997; Marcar como firmado</button>`)
+    : '';
+
   const actBtns = isSaved
     ? (isPend
         ? `<button class="vbtn vbtn-print" onclick="doPrint()">🖨 Imprimir y entregar</button>`
@@ -1821,6 +1852,7 @@ function renderVista(lote, serie){
         ${isSaved && !isPend?'<button class="vbtn vbtn-excel" onclick="abrirCobro(\''+esc(lote.orden)+'\')">💰 Registrar cobro</button>':''}
         ${isSaved && CURR_COBRADOS.length>0?'<button class="vbtn vbtn-pdf" onclick="reporteCobranzas()">📊 Reporte cobranzas</button>':''}
         ${impNotice}
+        ${firmaNotice}
       </div>
     </div>
     ${sheetHTML}`;
@@ -2715,7 +2747,7 @@ async function verDetalle(orden, evt) {
 
   var html =
     campo('Orden', '#' + l.orden) +
-    campo('Estado', l.estado) +
+    campo('Estado', l.fechaFirma ? 'FIRMADO' : l.estado) +
     campo('Fecha carga', l.fecha) +
     campo('Modo', modoLabel) +
     '<div style="height:8px"></div>' +
@@ -2743,7 +2775,8 @@ async function verDetalle(orden, evt) {
 
   if (l.fechaImpresion) {
     html += '<div style="height:8px"></div>' +
-      campo('Fecha impresión', l.fechaImpresion);
+      campo('Fecha impresión', l.fechaImpresion) +
+      campo('Firmado el', l.fechaFirma);
   }
   if (l.hash) {
     html += campo('Hash', l.hash.slice(0, 20) + '...');
